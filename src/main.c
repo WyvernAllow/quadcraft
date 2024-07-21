@@ -18,6 +18,11 @@ int main(void) {
 		.zoom = 1.0f,
 		.target = (Vector2){ 0.0f, 0.0f },
 	};
+
+	float target_zoom = 1.0f;
+	Vector2 target_pos = (Vector2){ 0.0f, 0.0f };
+
+	// SetTargetFPS(60);
 	
 	while (!WindowShouldClose()) {
 		Vector2 wish_dir = {0.0f, 0.0f};
@@ -39,20 +44,27 @@ int main(void) {
 		}
 
 		if (GetMouseWheelMove() < 0.0) {
-			camera.zoom *= 0.9;
+			target_zoom *= 0.9;
 		}
 		else if (GetMouseWheelMove() > 0.0) {
-			camera.zoom /= 0.9;
+			target_zoom /= 0.9;
 		}
 
+		camera.zoom = Lerp(camera.zoom, target_zoom, 2 * GetFrameTime());
+
 		camera.offset = (Vector2){ GetScreenWidth() / 2.0f, GetScreenHeight() / 2.0f },
-		camera.target = Vector2Add(camera.target, Vector2Scale(Vector2Normalize(wish_dir), GetFrameTime() * 32.0f));
+		target_pos = Vector2Add(target_pos, Vector2Scale(Vector2Normalize(wish_dir), GetFrameTime() * 64.0));
+
+		camera.target = Vector2Lerp(camera.target, target_pos, 1.0 * GetFrameTime());
 
 		BeginDrawing();
 		ClearBackground(BLACK);
-		BeginShaderMode(shader);
+
+		DrawRectangleGradientV(0, 0, GetScreenWidth(), GetScreenHeight(), BLUE, SKYBLUE);
 
 		BeginMode2D(camera);
+
+		BeginShaderMode(shader);
 
 		for (size_t x = 0; x < 16; x++) {
 			for (size_t y = 0; y < 16; y++) {
@@ -60,9 +72,10 @@ int main(void) {
 			}
 		}
 
+		EndShaderMode(shader);
+
 		EndMode2D();
 
-		BeginShaderMode(shader);
 		EndDrawing();
 	}
 
