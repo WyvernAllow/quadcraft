@@ -33,9 +33,6 @@ namespace qc {
 		void set_bg_tile(int x, int y, tile_type tile);
 
 	private:
-		tile get_tile(int x, int y) const;
-		void set_tile(int x, int y, tile tile);
-
 		bool in_bounds(int x, int y) const;
 		size_t get_index(int x, int y) const;
 
