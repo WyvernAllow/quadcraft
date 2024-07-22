@@ -17,8 +17,7 @@ vec4 texture_2d_aa(sampler2D tex, vec2 uv) {
     return texture(tex, uv_texspace / texsize);
 }
 
-void main()
-{
+void main() {
     vec4 texelColor = texture_2d_aa(texture0, fragTexCoord);
-    finalColor = texelColor * colDiffuse;
+    finalColor = texelColor * colDiffuse * fragColor;
 }

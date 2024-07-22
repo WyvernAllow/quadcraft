@@ -1,12 +1,13 @@
 ﻿cmake_minimum_required(VERSION 3.8)
-project("quadcraft" VERSION 0.1.0 LANGUAGES C)
+project("quadcraft" VERSION 0.1.0 LANGUAGES C CXX)
 
 set(BUILD_SHARED_LIBS OFF)
 add_subdirectory(deps/raylib)
 
 add_executable(${PROJECT_NAME}
-	"src/main.c"
-)
+	"src/main.cpp"
+	   
+ "src/chunk.cpp")
 
 set_property(TARGET ${PROJECT_NAME} PROPERTY C_STANDARD 99)
 
