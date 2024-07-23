@@ -3,6 +3,7 @@
 #include <raymath.h>
 
 #include <memory>
+#include <cmath>
 
 #include "chunk.hpp"
 
@@ -83,15 +84,15 @@ int main() {
 		Vector2 mouse_pos = GetScreenToWorld2D(GetMousePosition(), camera);
 
 		if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
-			int x = (int)floorf(mouse_pos.x / 16.0);
-			int y = (int)floorf(mouse_pos.y / 16.0);
+			int x = (int)std::floor(mouse_pos.x / 16.0);
+			int y = (int)std::floor(mouse_pos.y / 16.0);
 
 			chunk->set_fg_tile(x, y, qc::tile_type::AIR);
 		}
 
 		if (IsMouseButtonDown(MOUSE_BUTTON_RIGHT)) {
-			int x = (int)floorf(mouse_pos.x / 16.0);
-			int y = (int)floorf(mouse_pos.y / 16.0);
+			int x = (int)std::floor(mouse_pos.x / 16.0);
+			int y = (int)std::floor(mouse_pos.y / 16.0);
 
 			chunk->set_fg_tile(x, y, qc::tile_type::DIRT);
 		}
