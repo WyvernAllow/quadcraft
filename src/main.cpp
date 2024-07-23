@@ -47,13 +47,6 @@ int main() {
 		}
 	}
 
-	Rectangle player = {
-		0.0f,
-		0.0f,
-		16.0f,
-		32.0f
-	};
-	
 	while (!WindowShouldClose()) {
 		Vector2 wish_dir = {0.0f, 0.0f};
 
@@ -121,10 +114,10 @@ int main() {
 					if (bg != qc::tile_type::AIR) {
 						DrawTexture(tex, x * 16.0f, y * 16.0f, GRAY);
 
-						bool n = chunk->get_fg_tile(x + 0, y - 1);
-						bool e = chunk->get_fg_tile(x + 1, y + 0);
-						bool s = chunk->get_fg_tile(x + 0, y + 1);
-						bool w = chunk->get_fg_tile(x - 1, y + 0);
+						bool n = chunk->get_fg_tile(x + 0, y - 1) != qc::tile_type::AIR;
+						bool e = chunk->get_fg_tile(x + 1, y + 0) != qc::tile_type::AIR;
+						bool s = chunk->get_fg_tile(x + 0, y + 1) != qc::tile_type::AIR;
+						bool w = chunk->get_fg_tile(x - 1, y + 0) != qc::tile_type::AIR;
 
 						if (n) {
 							DrawTexture(north, x * 16.0f, y * 16.0f, WHITE);
@@ -152,9 +145,6 @@ int main() {
 
 		EndBlendMode();
 		EndShaderMode();
-
-		DrawRectangle(player.x, player.y, player.width, player.height, RED);
-
 		EndMode2D();
 		EndDrawing();
 	}
