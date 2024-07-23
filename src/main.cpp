@@ -2,6 +2,8 @@
 #include <raylib.h>
 #include <raymath.h>
 
+#include <memory>
+
 #include "chunk.hpp"
 
 int main() {
@@ -11,6 +13,7 @@ int main() {
 
 	Texture2D tex = LoadTexture("res/textures/texture.png");
 	SetTextureFilter(tex, TEXTURE_FILTER_BILINEAR);
+	BeginBlendMode(BLEND_ALPHA_PREMULTIPLY);
 
 	Shader shader = LoadShader(NULL, "res/shaders/pixel_aa.frag");
 
@@ -23,16 +26,33 @@ int main() {
 	float target_zoom = 1.0f;
 	Vector2 target_pos = { 0.0f, 0.0f };
 
+	Texture2D north = LoadTexture("res/textures/north.png");
+	Texture2D east = LoadTexture("res/textures/east.png");
+	Texture2D south = LoadTexture("res/textures/south.png");
+	Texture2D west = LoadTexture("res/textures/west.png");
+
+	SetTextureFilter(north, TEXTURE_FILTER_BILINEAR);
+	SetTextureFilter(east, TEXTURE_FILTER_BILINEAR);
+	SetTextureFilter(south, TEXTURE_FILTER_BILINEAR);
+	SetTextureFilter(west, TEXTURE_FILTER_BILINEAR);
+
 	// SetTargetFPS(60);
 	
-	qc::chunk chunk;
+	std::unique_ptr<qc::chunk> chunk;
 
 	for (int x = 0; x < qc::CHUNK_WIDTH; x++) {
 		for (int y = 0; y < qc::CHUNK_HEIGHT; y++) {
-			chunk.set_fg_tile(x, y, qc::tile_type::DIRT);
-			chunk.set_bg_tile(x, y, qc::tile_type::DIRT);
+			chunk->set_fg_tile(x, y, qc::tile_type::DIRT);
+			chunk->set_bg_tile(x, y, qc::tile_type::DIRT);
 		}
 	}
+
+	Rectangle player = {
+		0.0f,
+		0.0f,
+		16.0f,
+		32.0f
+	};
 	
 	while (!WindowShouldClose()) {
 		Vector2 wish_dir = {0.0f, 0.0f};
@@ -73,14 +93,14 @@ int main() {
 			int x = (int)floorf(mouse_pos.x / 16.0);
 			int y = (int)floorf(mouse_pos.y / 16.0);
 
-			chunk.set_fg_tile(x, y, qc::tile_type::AIR);
+			chunk->set_fg_tile(x, y, qc::tile_type::AIR);
 		}
 
 		if (IsMouseButtonDown(MOUSE_BUTTON_RIGHT)) {
 			int x = (int)floorf(mouse_pos.x / 16.0);
 			int y = (int)floorf(mouse_pos.y / 16.0);
 
-			chunk.set_fg_tile(x, y, qc::tile_type::DIRT);
+			chunk->set_fg_tile(x, y, qc::tile_type::DIRT);
 		}
 
 		BeginDrawing();
@@ -89,54 +109,53 @@ int main() {
 		DrawRectangleGradientV(0, 0, GetScreenWidth(), GetScreenHeight(), BLUE, SKYBLUE);
 
 		BeginMode2D(camera);
-
 		BeginShaderMode(shader);
-
-		SetShapesTexture(tex, { 0, 0, 16, 16 });
+		BeginBlendMode(BLEND_ALPHA_PREMULTIPLY);
 
 		for (int x = 0; x < qc::CHUNK_WIDTH; x++) {
 			for (int y = 0; y < qc::CHUNK_HEIGHT; y++) {
-				auto fg = chunk.get_fg_tile(x, y);
-				auto bg = chunk.get_bg_tile(x, y);
+				auto fg = chunk->get_fg_tile(x, y);
+				auto bg = chunk->get_bg_tile(x, y);
 
 				if (fg == qc::tile_type::AIR) {
 					if (bg != qc::tile_type::AIR) {
-						bool n =  chunk.get_fg_tile(x + 0, y - 1) != qc::tile_type::AIR;
-						bool ne = chunk.get_fg_tile(x + 1, y - 1) != qc::tile_type::AIR;
-						bool e =  chunk.get_fg_tile(x + 1, y + 0) != qc::tile_type::AIR;
-						bool se = chunk.get_fg_tile(x + 1, y + 1) != qc::tile_type::AIR;
-						bool s =  chunk.get_fg_tile(x + 0, y + 1) != qc::tile_type::AIR;
-						bool sw = chunk.get_fg_tile(x - 1, y + 1) != qc::tile_type::AIR;
-						bool w =  chunk.get_fg_tile(x - 1, y + 0) != qc::tile_type::AIR;
-						bool nw = chunk.get_fg_tile(x - 1, y - 1) != qc::tile_type::AIR;
+						DrawTexture(tex, x * 16.0f, y * 16.0f, GRAY);
 
-						bool tl = (w || nw || n);
-						bool tr = (n || ne || e);
-						bool br = (e || se || s);
-						bool bl = (w || sw || s);
+						bool n = chunk->get_fg_tile(x + 0, y - 1);
+						bool e = chunk->get_fg_tile(x + 1, y + 0);
+						bool s = chunk->get_fg_tile(x + 0, y + 1);
+						bool w = chunk->get_fg_tile(x - 1, y + 0);
 
-						Color col1 = tl ? Color{25, 25, 40, 255} : GRAY;
-						Color col2 = bl ? Color{25, 25, 40, 255} : GRAY;
-						Color col3 = br ? Color{25, 25, 40, 255} : GRAY;
-						Color col4 = tr ? Color{25, 25, 40, 255} : GRAY;
+						if (n) {
+							DrawTexture(north, x * 16.0f, y * 16.0f, WHITE);
+						}
 
-						// tl, bl, br, tr
-						DrawRectangleGradientEx(Rectangle{ x * 16.0f, y * 16.0f, 16, 16 }, col1, col2, col3, col4);
+						if (e) {
+							DrawTexture(east, x * 16.0f, y * 16.0f, WHITE);
+						}
+
+						if (s) {
+							DrawTexture(south, x * 16.0f, y * 16.0f, WHITE);
+						}
+
+						if (w) {
+							DrawTexture(west, x * 16.0f, y * 16.0f, WHITE);
+						}
 					}
 				}
 				
 				if (fg != qc::tile_type::AIR) {
-					DrawRectangle(x * 16.0f, y * 16.0f, 16, 16, WHITE);
+					DrawTexture(tex, x * 16.0f, y * 16.0f, WHITE);
 				}
 			}
 		}
 
-		SetShapesTexture(Texture2D{ 1, 1, 1, 1, 7 }, Rectangle{ 0.0f, 0.0f, 1.0f, 1.0f });
-
+		EndBlendMode();
 		EndShaderMode();
 
-		EndMode2D();
+		DrawRectangle(player.x, player.y, player.width, player.height, RED);
 
+		EndMode2D();
 		EndDrawing();
 	}
 
