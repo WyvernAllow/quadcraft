@@ -9,7 +9,7 @@ add_executable(${PROJECT_NAME}
 	   
  "src/chunk.cpp")
 
-set_property(TARGET ${PROJECT_NAME} PROPERTY C_STANDARD 99)
+set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 20)
 
 target_link_libraries(${PROJECT_NAME}
 	raylib
