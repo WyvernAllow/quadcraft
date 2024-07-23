@@ -38,7 +38,7 @@ int main() {
 
 	// SetTargetFPS(60);
 	
-	std::unique_ptr<qc::chunk> chunk;
+	std::unique_ptr<qc::chunk> chunk = std::make_unique<qc::chunk>();
 
 	for (int x = 0; x < qc::CHUNK_WIDTH; x++) {
 		for (int y = 0; y < qc::CHUNK_HEIGHT; y++) {
