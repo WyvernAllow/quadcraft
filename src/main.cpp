@@ -2,19 +2,38 @@
 #include <raylib.h>
 #include <raymath.h>
 
+#include <vector>
 #include <memory>
 #include <cmath>
 
 #include "chunk.hpp"
+
+Rectangle get_src_rect(int dx, int dy) {
+	int ox = -dx;
+	int oy = -dy;
+
+	Rectangle src = {
+		(ox * 16) + 16,
+		(oy * 16) + 16,
+		16,
+		16
+	};
+
+	return src;
+}
 
 int main() {
 	SetConfigFlags(FLAG_MSAA_4X_HINT);
 	SetConfigFlags(FLAG_WINDOW_RESIZABLE);
 	InitWindow(800, 450, "Quadcraft");
 
-	Texture2D tex = LoadTexture("res/textures/texture.png");
-	SetTextureFilter(tex, TEXTURE_FILTER_BILINEAR);
-	BeginBlendMode(BLEND_ALPHA_PREMULTIPLY);
+	Texture2D stone_texture = LoadTexture("res/textures/texture.png");
+	SetTextureFilter(stone_texture, TEXTURE_FILTER_BILINEAR);
+	SetTextureWrap(stone_texture, TEXTURE_WRAP_CLAMP);
+
+	Texture2D ao_texture = LoadTexture("res/textures/ao.png");
+	SetTextureFilter(ao_texture, TEXTURE_FILTER_BILINEAR);
+	SetTextureWrap(ao_texture, TEXTURE_WRAP_CLAMP);
 
 	Shader shader = LoadShader(NULL, "res/shaders/pixel_aa.frag");
 
@@ -26,18 +45,6 @@ int main() {
 
 	float target_zoom = 1.0f;
 	Vector2 target_pos = { 0.0f, 0.0f };
-
-	Texture2D north = LoadTexture("res/textures/north.png");
-	Texture2D east = LoadTexture("res/textures/east.png");
-	Texture2D south = LoadTexture("res/textures/south.png");
-	Texture2D west = LoadTexture("res/textures/west.png");
-
-	SetTextureFilter(north, TEXTURE_FILTER_BILINEAR);
-	SetTextureFilter(east, TEXTURE_FILTER_BILINEAR);
-	SetTextureFilter(south, TEXTURE_FILTER_BILINEAR);
-	SetTextureFilter(west, TEXTURE_FILTER_BILINEAR);
-
-	// SetTargetFPS(60);
 	
 	std::unique_ptr<qc::chunk> chunk = std::make_unique<qc::chunk>();
 
@@ -104,47 +111,75 @@ int main() {
 
 		BeginMode2D(camera);
 		BeginShaderMode(shader);
-		BeginBlendMode(BLEND_ALPHA_PREMULTIPLY);
 
-		for (int x = 0; x < qc::CHUNK_WIDTH; x++) {
-			for (int y = 0; y < qc::CHUNK_HEIGHT; y++) {
+		Vector2 top_left = GetScreenToWorld2D({0, 0}, camera);
+		Vector2 bottom_left = GetScreenToWorld2D(Vector2{ (float)GetScreenWidth(), (float)GetScreenHeight() }, camera);
+
+		int start_x = (int)std::floor(top_left.x / 16.0) - 1;
+		int start_y = (int)std::floor(top_left.y / 16.0) - 1;
+		int end_x = (int)std::floor(bottom_left.x / 16.0) + 1;
+		int end_y = (int)std::floor(bottom_left.y / 16.0) + 1;
+
+		for (int x = start_x; x < end_x; x++) {
+			for (int y = start_y; y < end_y; y++) {
 				auto fg = chunk->get_fg_tile(x, y);
 				auto bg = chunk->get_bg_tile(x, y);
 
 				if (fg == qc::tile_type::AIR) {
 					if (bg != qc::tile_type::AIR) {
-						DrawTexture(tex, x * 16.0f, y * 16.0f, GRAY);
+						DrawTexture(stone_texture, x * 16.0f, y * 16.0f, GRAY);
 
-						bool n = chunk->get_fg_tile(x + 0, y - 1) != qc::tile_type::AIR;
-						bool e = chunk->get_fg_tile(x + 1, y + 0) != qc::tile_type::AIR;
-						bool s = chunk->get_fg_tile(x + 0, y + 1) != qc::tile_type::AIR;
-						bool w = chunk->get_fg_tile(x - 1, y + 0) != qc::tile_type::AIR;
+						bool n =  chunk->get_fg_tile(x + 0, y - 1) != qc::tile_type::AIR;
+						bool e =  chunk->get_fg_tile(x + 1, y + 0) != qc::tile_type::AIR;
+						bool s =  chunk->get_fg_tile(x + 0, y + 1) != qc::tile_type::AIR;
+						bool w =  chunk->get_fg_tile(x - 1, y + 0) != qc::tile_type::AIR;
+						bool ne = chunk->get_fg_tile(x + 1, y - 1) != qc::tile_type::AIR;
+						bool se = chunk->get_fg_tile(x + 1, y + 1) != qc::tile_type::AIR;
+						bool sw = chunk->get_fg_tile(x - 1, y + 1) != qc::tile_type::AIR;
+						bool nw = chunk->get_fg_tile(x - 1, y - 1) != qc::tile_type::AIR;
+
+						Color ao_col = { 255, 255, 255, 200 };
 
 						if (n) {
-							DrawTexture(north, x * 16.0f, y * 16.0f, WHITE);
+							DrawTextureRec(ao_texture, get_src_rect(0, -1), { x * 16.0f, y * 16.0f }, ao_col);
 						}
 
 						if (e) {
-							DrawTexture(east, x * 16.0f, y * 16.0f, WHITE);
+							DrawTextureRec(ao_texture, get_src_rect(1, 0), { x * 16.0f, y * 16.0f }, ao_col);
 						}
 
 						if (s) {
-							DrawTexture(south, x * 16.0f, y * 16.0f, WHITE);
+							DrawTextureRec(ao_texture, get_src_rect(0, 1), { x * 16.0f, y * 16.0f }, ao_col);
 						}
 
 						if (w) {
-							DrawTexture(west, x * 16.0f, y * 16.0f, WHITE);
+							DrawTextureRec(ao_texture, get_src_rect(-1, 0), { x * 16.0f, y * 16.0f }, ao_col);
+						}
+
+						if (ne && !n && !e) {
+							DrawTextureRec(ao_texture, get_src_rect(1, -1), { x * 16.0f, y * 16.0f }, ao_col);
+						}
+
+						if (se && !s && !e) {
+							DrawTextureRec(ao_texture, get_src_rect(1, 1), { x * 16.0f, y * 16.0f }, ao_col);
+						}
+
+						if (sw && !s && !w) {
+							DrawTextureRec(ao_texture, get_src_rect(-1, 1), { x * 16.0f, y * 16.0f }, ao_col);
+						}
+
+						if (nw && !n && !w) {
+							DrawTextureRec(ao_texture, get_src_rect(-1, -1), { x * 16.0f, y * 16.0f }, ao_col);
 						}
 					}
 				}
-				
+
 				if (fg != qc::tile_type::AIR) {
-					DrawTexture(tex, x * 16.0f, y * 16.0f, WHITE);
+					DrawTexture(stone_texture, x * 16.0f, y * 16.0f, WHITE);
 				}
 			}
 		}
 
-		EndBlendMode();
 		EndShaderMode();
 		EndMode2D();
 		EndDrawing();
