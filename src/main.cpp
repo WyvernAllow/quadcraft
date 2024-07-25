@@ -9,7 +9,9 @@
 #include "chunk.hpp"
 
 #include <yaml-cpp/yaml.h>
-#include <iostream>
+#include <spdlog/spdlog.h>
+
+#include <cstdarg>
 
 // Cell size in pixels
 static constexpr int CELL_SIZE = 16;
@@ -28,7 +30,33 @@ Rectangle get_src_rect(int dx, int dy) {
 	return src;
 }
 
+static void raylib_spdlog_callback(int msgType, const char *text, va_list args) {
+	char buffer[1024];
+	vsnprintf(buffer, sizeof(buffer), text, args);
+
+	switch (msgType)
+	{
+	case LOG_INFO:
+		spdlog::info("{}", buffer);
+		break;
+	case LOG_ERROR:
+		spdlog::error("{}", buffer);
+		break;
+	case LOG_WARNING:
+		spdlog::warn("{}", buffer);
+		break;
+	case LOG_DEBUG:
+		spdlog::debug("{}", buffer);
+		break;
+	default:
+		spdlog::info("{}", buffer);
+		break;
+	}
+}
+
 int main() {
+	SetTraceLogCallback(raylib_spdlog_callback);
+
 	SetConfigFlags(FLAG_MSAA_4X_HINT);
 	SetConfigFlags(FLAG_WINDOW_RESIZABLE);
 	InitWindow(800, 450, "Quadcraft");
