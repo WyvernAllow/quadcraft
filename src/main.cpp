@@ -8,15 +8,18 @@
 
 #include "chunk.hpp"
 
+// Cell size in pixels
+static constexpr int CELL_SIZE = 16;
+
 Rectangle get_src_rect(int dx, int dy) {
 	int ox = -dx;
 	int oy = -dy;
 
 	Rectangle src = {
-		(ox * 16) + 16,
-		(oy * 16) + 16,
-		16,
-		16
+		(ox * CELL_SIZE) + CELL_SIZE,
+		(oy * CELL_SIZE) + CELL_SIZE,
+		CELL_SIZE,
+		CELL_SIZE
 	};
 
 	return src;
@@ -91,15 +94,15 @@ int main() {
 		Vector2 mouse_pos = GetScreenToWorld2D(GetMousePosition(), camera);
 
 		if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
-			int x = (int)std::floor(mouse_pos.x / 16.0);
-			int y = (int)std::floor(mouse_pos.y / 16.0);
+			int x = (int)std::floor(mouse_pos.x / CELL_SIZE);
+			int y = (int)std::floor(mouse_pos.y / CELL_SIZE);
 
 			chunk->set_fg_tile(x, y, qc::tile_type::AIR);
 		}
 
 		if (IsMouseButtonDown(MOUSE_BUTTON_RIGHT)) {
-			int x = (int)std::floor(mouse_pos.x / 16.0);
-			int y = (int)std::floor(mouse_pos.y / 16.0);
+			int x = (int)std::floor(mouse_pos.x / CELL_SIZE);
+			int y = (int)std::floor(mouse_pos.y / CELL_SIZE);
 
 			chunk->set_fg_tile(x, y, qc::tile_type::DIRT);
 		}
@@ -115,19 +118,20 @@ int main() {
 		Vector2 top_left = GetScreenToWorld2D({0, 0}, camera);
 		Vector2 bottom_left = GetScreenToWorld2D(Vector2{ (float)GetScreenWidth(), (float)GetScreenHeight() }, camera);
 
-		int start_x = (int)std::floor(top_left.x / 16.0) - 1;
-		int start_y = (int)std::floor(top_left.y / 16.0) - 1;
-		int end_x = (int)std::floor(bottom_left.x / 16.0) + 1;
-		int end_y = (int)std::floor(bottom_left.y / 16.0) + 1;
+		int start_x = (int)std::floor(top_left.x / CELL_SIZE) - 1;
+		int start_y = (int)std::floor(top_left.y / CELL_SIZE) - 1;
+		int end_x = (int)std::floor(bottom_left.x / CELL_SIZE) + 1;
+		int end_y = (int)std::floor(bottom_left.y / CELL_SIZE) + 1;
 
 		for (int x = start_x; x < end_x; x++) {
 			for (int y = start_y; y < end_y; y++) {
 				auto fg = chunk->get_fg_tile(x, y);
 				auto bg = chunk->get_bg_tile(x, y);
+				Vector2 tile_world_pos = { x * CELL_SIZE, y * CELL_SIZE };
 
 				if (fg == qc::tile_type::AIR) {
 					if (bg != qc::tile_type::AIR) {
-						DrawTexture(stone_texture, x * 16.0f, y * 16.0f, GRAY);
+						DrawTextureRec(stone_texture, { 0, 0, 16, 16 }, tile_world_pos, GRAY);
 
 						bool n =  chunk->get_fg_tile(x + 0, y - 1) != qc::tile_type::AIR;
 						bool e =  chunk->get_fg_tile(x + 1, y + 0) != qc::tile_type::AIR;
@@ -141,41 +145,41 @@ int main() {
 						Color ao_col = { 255, 255, 255, 200 };
 
 						if (n) {
-							DrawTextureRec(ao_texture, get_src_rect(0, -1), { x * 16.0f, y * 16.0f }, ao_col);
+							DrawTextureRec(ao_texture, get_src_rect(0, -1), tile_world_pos, ao_col);
 						}
 
 						if (e) {
-							DrawTextureRec(ao_texture, get_src_rect(1, 0), { x * 16.0f, y * 16.0f }, ao_col);
+							DrawTextureRec(ao_texture, get_src_rect(1, 0), tile_world_pos, ao_col);
 						}
 
 						if (s) {
-							DrawTextureRec(ao_texture, get_src_rect(0, 1), { x * 16.0f, y * 16.0f }, ao_col);
+							DrawTextureRec(ao_texture, get_src_rect(0, 1), tile_world_pos, ao_col);
 						}
 
 						if (w) {
-							DrawTextureRec(ao_texture, get_src_rect(-1, 0), { x * 16.0f, y * 16.0f }, ao_col);
+							DrawTextureRec(ao_texture, get_src_rect(-1, 0), tile_world_pos, ao_col);
 						}
 
 						if (ne && !n && !e) {
-							DrawTextureRec(ao_texture, get_src_rect(1, -1), { x * 16.0f, y * 16.0f }, ao_col);
+							DrawTextureRec(ao_texture, get_src_rect(1, -1), tile_world_pos, ao_col);
 						}
 
 						if (se && !s && !e) {
-							DrawTextureRec(ao_texture, get_src_rect(1, 1), { x * 16.0f, y * 16.0f }, ao_col);
+							DrawTextureRec(ao_texture, get_src_rect(1, 1), tile_world_pos, ao_col);
 						}
 
 						if (sw && !s && !w) {
-							DrawTextureRec(ao_texture, get_src_rect(-1, 1), { x * 16.0f, y * 16.0f }, ao_col);
+							DrawTextureRec(ao_texture, get_src_rect(-1, 1), tile_world_pos, ao_col);
 						}
 
 						if (nw && !n && !w) {
-							DrawTextureRec(ao_texture, get_src_rect(-1, -1), { x * 16.0f, y * 16.0f }, ao_col);
+							DrawTextureRec(ao_texture, get_src_rect(-1, -1), tile_world_pos, ao_col);
 						}
 					}
 				}
 
 				if (fg != qc::tile_type::AIR) {
-					DrawTexture(stone_texture, x * 16.0f, y * 16.0f, WHITE);
+					DrawTextureRec(stone_texture, { 0, 0, 16, 16 }, tile_world_pos, WHITE);
 				}
 			}
 		}
