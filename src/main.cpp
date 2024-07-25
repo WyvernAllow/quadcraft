@@ -8,6 +8,9 @@
 
 #include "chunk.hpp"
 
+#include <yaml-cpp/yaml.h>
+#include <iostream>
+
 // Cell size in pixels
 static constexpr int CELL_SIZE = 16;
 
@@ -39,6 +42,10 @@ int main() {
 	SetTextureWrap(ao_texture, TEXTURE_WRAP_CLAMP);
 
 	Shader shader = LoadShader(NULL, "res/shaders/pixel_aa.frag");
+
+	YAML::Node tiledefs = YAML::LoadFile("res/tiles/tiledefs.yaml");
+
+	std::cout << "test string: " << tiledefs["test_str"] << "\n";
 
 	Camera2D camera = {};
 	camera.offset = { GetScreenWidth() / 2.0f, GetScreenHeight() / 2.0f };
