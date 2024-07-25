@@ -4,15 +4,20 @@ project("quadcraft" VERSION 0.1.0 LANGUAGES C CXX)
 set(BUILD_SHARED_LIBS OFF)
 add_subdirectory(deps/raylib)
 
+add_subdirectory(deps/yaml-cpp)
+
 add_executable(${PROJECT_NAME}
 	"src/main.cpp"
-	   
- "src/chunk.cpp")
+
+	"src/chunk.hpp"
+	"src/chunk.cpp"
+)
 
 set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 20)
 
 target_link_libraries(${PROJECT_NAME}
 	raylib
+	yaml-cpp::yaml-cpp
 )
 
 add_custom_target(copy_assets
