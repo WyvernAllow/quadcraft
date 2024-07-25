@@ -5,6 +5,7 @@ set(BUILD_SHARED_LIBS OFF)
 add_subdirectory(deps/raylib)
 
 add_subdirectory(deps/yaml-cpp)
+add_subdirectory(deps/spdlog)
 
 add_executable(${PROJECT_NAME}
 	"src/main.cpp"
@@ -18,6 +19,7 @@ set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 20)
 target_link_libraries(${PROJECT_NAME}
 	raylib
 	yaml-cpp::yaml-cpp
+	spdlog::spdlog
 )
 
 add_custom_target(copy_assets
