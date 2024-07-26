@@ -1,36 +1,28 @@
 #include "chunk.hpp"
 
 namespace qc {
-	tile_type chunk::get_fg_tile(int x, int y) const {
+	tile chunk::get_tile(int x, int y) const {
 		if (!in_bounds(x, y)) {
-			return tile_type::AIR;
+			return tile();
 		}
 
-		return m_tiles[get_index(x, y)].foreground;
+		return m_tiles[get_index(x, y)];
 	}
 
-	tile_type chunk::get_bg_tile(int x, int y) const {
-		if (!in_bounds(x, y)) {
-			return tile_type::AIR;
-		}
-
-		return m_tiles[get_index(x, y)].background;
-	}
-
-	void chunk::set_fg_tile(int x, int y, tile_type tile) {
+	void chunk::set_foreground_tile(int x, int y, tile_type type) {
 		if (!in_bounds(x, y)) {
 			return;
 		}
 
-		m_tiles[get_index(x, y)].foreground = tile;
+		m_tiles[get_index(x, y)].foreground = type;
 	}
 
-	void chunk::set_bg_tile(int x, int y, tile_type tile) {
+	void chunk::set_background_tile(int x, int y, tile_type type) {
 		if (!in_bounds(x, y)) {
 			return;
 		}
 
-		m_tiles[get_index(x, y)].background = tile;
+		m_tiles[get_index(x, y)].background = type;
 	}
 
 	bool chunk::in_bounds(int x, int y) const {

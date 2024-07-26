@@ -8,7 +8,6 @@
 
 #include "chunk.hpp"
 
-#include <yaml-cpp/yaml.h>
 #include <spdlog/spdlog.h>
 
 #include <cstdarg>
@@ -57,13 +56,13 @@ static void raylib_spdlog_callback(int msgType, const char *text, va_list args) 
 int main() {
 	SetTraceLogCallback(raylib_spdlog_callback);
 
-	SetConfigFlags(FLAG_MSAA_4X_HINT);
 	SetConfigFlags(FLAG_WINDOW_RESIZABLE);
+	SetConfigFlags(FLAG_MSAA_4X_HINT);
 	InitWindow(800, 450, "Quadcraft");
 
-	Texture2D stone_texture = LoadTexture("res/textures/texture.png");
-	SetTextureFilter(stone_texture, TEXTURE_FILTER_BILINEAR);
-	SetTextureWrap(stone_texture, TEXTURE_WRAP_CLAMP);
+	Texture2D atlas = LoadTexture("res/textures/atlas.png");
+	SetTextureFilter(atlas, TEXTURE_FILTER_BILINEAR);
+	SetTextureWrap(atlas, TEXTURE_WRAP_CLAMP);
 
 	Texture2D ao_texture = LoadTexture("res/textures/ao.png");
 	SetTextureFilter(ao_texture, TEXTURE_FILTER_BILINEAR);
@@ -84,8 +83,8 @@ int main() {
 
 	for (int x = 0; x < qc::CHUNK_WIDTH; x++) {
 		for (int y = 0; y < qc::CHUNK_HEIGHT; y++) {
-			chunk->set_fg_tile(x, y, qc::tile_type::DIRT);
-			chunk->set_bg_tile(x, y, qc::tile_type::DIRT);
+			chunk->set_foreground_tile(x, y, qc::tile_type::AIR);
+			chunk->set_background_tile(x, y, qc::tile_type::DIRT);
 		}
 	}
 
@@ -128,14 +127,24 @@ int main() {
 			int x = (int)std::floor(mouse_pos.x / CELL_SIZE);
 			int y = (int)std::floor(mouse_pos.y / CELL_SIZE);
 
-			chunk->set_fg_tile(x, y, qc::tile_type::AIR);
+			if (IsKeyDown(KEY_LEFT_SHIFT)) {
+				chunk->set_background_tile(x, y, qc::tile_type::STONE);
+			}
+			else {
+				chunk->set_foreground_tile(x, y, qc::tile_type::STONE);
+			}
 		}
 
 		if (IsMouseButtonDown(MOUSE_BUTTON_RIGHT)) {
 			int x = (int)std::floor(mouse_pos.x / CELL_SIZE);
 			int y = (int)std::floor(mouse_pos.y / CELL_SIZE);
 
-			chunk->set_fg_tile(x, y, qc::tile_type::DIRT);
+			if (IsKeyDown(KEY_LEFT_SHIFT)) {
+				chunk->set_background_tile(x, y, qc::tile_type::AIR);
+			}
+			else {
+				chunk->set_foreground_tile(x, y, qc::tile_type::AIR);
+			}
 		}
 
 		BeginDrawing();
@@ -156,22 +165,25 @@ int main() {
 
 		for (int x = start_x; x < end_x; x++) {
 			for (int y = start_y; y < end_y; y++) {
-				auto fg = chunk->get_fg_tile(x, y);
-				auto bg = chunk->get_bg_tile(x, y);
+				qc::tile tile = chunk->get_tile(x, y);
+
+				const auto& fg_props = qc::get_tile_properties(tile.foreground);
+				const auto& bg_props = qc::get_tile_properties(tile.background);
+
 				Vector2 tile_world_pos = { x * CELL_SIZE, y * CELL_SIZE };
 
-				if (fg == qc::tile_type::AIR) {
-					if (bg != qc::tile_type::AIR) {
-						DrawTextureRec(stone_texture, { 0, 0, 16, 16 }, tile_world_pos, GRAY);
+				if (fg_props.is_transparent) {
+					if (tile.background != qc::tile_type::AIR) {
+						DrawTextureRec(atlas, { (float)bg_props.atlas_x * 16, (float)bg_props.atlas_y * 16, 16, 16 }, tile_world_pos, GRAY);
 
-						bool n =  chunk->get_fg_tile(x + 0, y - 1) != qc::tile_type::AIR;
-						bool e =  chunk->get_fg_tile(x + 1, y + 0) != qc::tile_type::AIR;
-						bool s =  chunk->get_fg_tile(x + 0, y + 1) != qc::tile_type::AIR;
-						bool w =  chunk->get_fg_tile(x - 1, y + 0) != qc::tile_type::AIR;
-						bool ne = chunk->get_fg_tile(x + 1, y - 1) != qc::tile_type::AIR;
-						bool se = chunk->get_fg_tile(x + 1, y + 1) != qc::tile_type::AIR;
-						bool sw = chunk->get_fg_tile(x - 1, y + 1) != qc::tile_type::AIR;
-						bool nw = chunk->get_fg_tile(x - 1, y - 1) != qc::tile_type::AIR;
+						bool n =  chunk->get_tile(x + 0, y - 1).foreground != qc::tile_type::AIR;
+						bool e =  chunk->get_tile(x + 1, y + 0).foreground != qc::tile_type::AIR;
+						bool s =  chunk->get_tile(x + 0, y + 1).foreground != qc::tile_type::AIR;
+						bool w =  chunk->get_tile(x - 1, y + 0).foreground != qc::tile_type::AIR;
+						bool ne = chunk->get_tile(x + 1, y - 1).foreground != qc::tile_type::AIR;
+						bool se = chunk->get_tile(x + 1, y + 1).foreground != qc::tile_type::AIR;
+						bool sw = chunk->get_tile(x - 1, y + 1).foreground != qc::tile_type::AIR;
+						bool nw = chunk->get_tile(x - 1, y - 1).foreground != qc::tile_type::AIR;
 
 						Color ao_col = { 255, 255, 255, 200 };
 
@@ -209,8 +221,8 @@ int main() {
 					}
 				}
 
-				if (fg != qc::tile_type::AIR) {
-					DrawTextureRec(stone_texture, { 0, 0, 16, 16 }, tile_world_pos, WHITE);
+				if (tile.foreground != qc::tile_type::AIR) {
+					DrawTextureRec(atlas, { (float)fg_props.atlas_x * 16, (float)fg_props.atlas_y * 16, 16, 16 }, tile_world_pos, WHITE);
 				}
 			}
 		}

@@ -9,9 +9,10 @@ add_subdirectory(deps/spdlog)
 
 add_executable(${PROJECT_NAME}
 	"src/main.cpp"
-
 	"src/chunk.hpp"
 	"src/chunk.cpp"
+	"src/tiles.hpp"
+	"src/tiles.cpp"
 )
 
 set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 20)
