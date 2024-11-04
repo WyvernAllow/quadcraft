@@ -2,6 +2,14 @@
 
 #include <math.h>
 
+float deg_to_rad(float degrees) {
+    return degrees * (M_PI / 180.0f);
+}
+
+float rad_to_deg(float radians) {
+    return radians * (180.0f / M_PI);
+}
+
 vec3 vec3_add(vec3 a, vec3 b) {
     vec3 result = {
         .x = a.x + b.x,

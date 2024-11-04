@@ -1,6 +1,13 @@
 #ifndef LMATH_H
 #define LMATH_H
 
+#ifndef M_PI
+#    define M_PI 3.14159265358979323846
+#endif
+
+float deg_to_rad(float degrees);
+float rad_to_deg(float radians);
+
 typedef struct vec3 {
     float x;
     float y;
