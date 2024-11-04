@@ -138,7 +138,7 @@ int main() {
 
     SDL_SetGPUSwapchainParameters(device, window,
                                   SDL_GPU_SWAPCHAINCOMPOSITION_SDR,
-                                  SDL_GPU_PRESENTMODE_IMMEDIATE);
+                                  SDL_GPU_PRESENTMODE_MAILBOX);
 
     SDL_GPUGraphicsPipeline *pipeline = create_pipeline(device, window);
     if (!pipeline) {
@@ -220,6 +220,13 @@ int main() {
     float current_time = SDL_GetTicks() / 1000.0f;
     float last_time = current_time;
 
+    bool fullscreen = false;
+    if (fullscreen) {
+        SDL_SetWindowFullscreen(window, true);
+    } else {
+        SDL_SetWindowFullscreen(window, false);
+    }
+
     bool is_running = true;
     while (is_running) {
         SDL_Event e;
@@ -232,6 +239,17 @@ int main() {
                 cam.pitch -= e.motion.yrel * 0.4f;
                 cam.yaw += e.motion.xrel * 0.4f;
                 break;
+
+            case SDL_EVENT_KEY_DOWN:
+                if (e.key.scancode == SDL_SCANCODE_F11) {
+                    fullscreen = !fullscreen;
+
+                    if (fullscreen) {
+                        SDL_SetWindowFullscreen(window, true);
+                    } else {
+                        SDL_SetWindowFullscreen(window, false);
+                    }
+                }
             }
         }
 
@@ -312,6 +330,7 @@ int main() {
     }
 
     SDL_ReleaseGPUGraphicsPipeline(device, pipeline);
+    SDL_ReleaseGPUBuffer(device, index_buffer);
     SDL_ReleaseGPUBuffer(device, vertex_buffer);
     SDL_DestroyGPUDevice(device);
     SDL_DestroyWindow(window);
