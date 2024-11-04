@@ -246,8 +246,11 @@ int main() {
         SDL_BindGPUVertexBuffers(
             render_pass, 0,
             &(SDL_GPUBufferBinding){.buffer = vertex_buffer, .offset = 0}, 1);
-        
-        SDL_BindGPUIndexBuffer(render_pass, &(SDL_GPUBufferBinding){.buffer = index_buffer, .offset = 0}, SDL_GPU_INDEXELEMENTSIZE_16BIT);
+
+        SDL_BindGPUIndexBuffer(
+            render_pass,
+            &(SDL_GPUBufferBinding){.buffer = index_buffer, .offset = 0},
+            SDL_GPU_INDEXELEMENTSIZE_16BIT);
         SDL_DrawGPUIndexedPrimitives(render_pass, index_count, 1, 0, 0, 0);
 
         SDL_EndGPURenderPass(render_pass);
