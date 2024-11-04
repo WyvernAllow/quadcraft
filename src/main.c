@@ -1,6 +1,7 @@
 #include <SDL3/SDL.h>
 #include <stdlib.h>
 
+#include "camera.h"
 #include "lmath.h"
 
 #define ARRAY_LENGTH(x) (sizeof(x) / sizeof((x)[0]))
@@ -121,6 +122,8 @@ int main() {
         return EXIT_FAILURE;
     }
 
+    SDL_SetWindowRelativeMouseMode(window, true);
+
     SDL_GPUDevice *device =
         SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV, false, NULL);
     if (!device) {
@@ -132,6 +135,10 @@ int main() {
         SDL_Log("SDL_ClaimWindowForGPUDevice failed: %s\n", SDL_GetError());
         return EXIT_FAILURE;
     }
+
+    SDL_SetGPUSwapchainParameters(device, window,
+                                  SDL_GPU_SWAPCHAINCOMPOSITION_SDR,
+                                  SDL_GPU_PRESENTMODE_IMMEDIATE);
 
     SDL_GPUGraphicsPipeline *pipeline = create_pipeline(device, window);
     if (!pipeline) {
@@ -151,15 +158,10 @@ int main() {
 
     const size_t index_count = ARRAY_LENGTH(indices);
 
-    mat4 proj;
-    mat4_perspective(&proj, 1.5f, 800.0f / 450.0f, 0.01f, 1000.0f);
+    camera cam;
+    camera_init(&cam, 90.0f, 800.0f / 450.0f, 0.01f, 1000.0f);
 
-    mat4 view;
-    mat4_lookat(&view, (vec3){0.0f, 0.0f, 3.0f}, (vec3){0.0f, 0.0f, 0.0f},
-                (vec3){0.0f, 1.0f, 0.0f});
-
-    mat4 mvp;
-    mat4_mul(&mvp, &proj, &view);
+    cam.position.z = 1.0f;
 
     SDL_GPUBuffer *vertex_buffer =
         SDL_CreateGPUBuffer(device, &(SDL_GPUBufferCreateInfo){
@@ -215,6 +217,9 @@ int main() {
     SDL_SubmitGPUCommandBuffer(upload_cmdbuf);
     SDL_ReleaseGPUTransferBuffer(device, buffer_trans_buffer);
 
+    float current_time = SDL_GetTicks() / 1000.0f;
+    float last_time = current_time;
+
     bool is_running = true;
     while (is_running) {
         SDL_Event e;
@@ -223,8 +228,40 @@ int main() {
             case SDL_EVENT_QUIT:
                 is_running = false;
                 break;
+            case SDL_EVENT_MOUSE_MOTION:
+                cam.pitch -= e.motion.yrel * 0.4f;
+                cam.yaw += e.motion.xrel * 0.4f;
+                break;
             }
         }
+
+        current_time = SDL_GetTicks() / 1000.0f;
+        float delta_time = current_time - last_time;
+        last_time = current_time;
+
+        const bool *keys = SDL_GetKeyboardState(NULL);
+
+        vec3 wishdir = {0};
+        if (keys[SDL_SCANCODE_W]) {
+            wishdir = vec3_add(wishdir, cam.forward);
+        }
+
+        if (keys[SDL_SCANCODE_S]) {
+            wishdir = vec3_sub(wishdir, cam.forward);
+        }
+
+        if (keys[SDL_SCANCODE_A]) {
+            wishdir = vec3_sub(wishdir, cam.right);
+        }
+
+        if (keys[SDL_SCANCODE_D]) {
+            wishdir = vec3_add(wishdir, cam.right);
+        }
+
+        cam.position = vec3_add(
+            cam.position, vec3_scale(vec3_norm(wishdir), 5.0f * delta_time));
+
+        camera_update(&cam);
 
         SDL_GPUCommandBuffer *cmdbuf = SDL_AcquireGPUCommandBuffer(device);
         if (!cmdbuf) {
@@ -252,7 +289,8 @@ int main() {
             .store_op = SDL_GPU_STOREOP_STORE,
         };
 
-        SDL_PushGPUVertexUniformData(cmdbuf, 0, mvp.m, sizeof(float) * 16);
+        SDL_PushGPUVertexUniformData(cmdbuf, 0, cam.view_proj.m,
+                                     sizeof(float) * 16);
 
         SDL_GPURenderPass *render_pass =
             SDL_BeginGPURenderPass(cmdbuf, &color_target_info, 1, NULL);

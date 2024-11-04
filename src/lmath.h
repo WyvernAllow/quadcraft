@@ -27,7 +27,7 @@ typedef struct mat4 {
 } mat4;
 
 void mat4_identity(mat4 *out);
-void mat4_perspective(mat4 *out, float fov, float aspect, float near, float far);
+void mat4_perspective(mat4 *out, float fov_rad, float aspect, float near, float far);
 void mat4_lookat(mat4 *out, vec3 eye, vec3 center, vec3 up);
 void mat4_mul(mat4 *out, mat4 *a, mat4 *b);
 

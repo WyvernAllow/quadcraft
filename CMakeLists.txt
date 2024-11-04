@@ -5,6 +5,8 @@ add_executable(${PROJECT_NAME}
     src/main.c
     src/lmath.c
     src/lmath.h
+    src/camera.c
+    src/camera.h
 )
 
 set(SDL_SHARED OFF)

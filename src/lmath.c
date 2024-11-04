@@ -74,10 +74,10 @@ void mat4_identity(mat4 *out) {
     out->m[15] = 1.0f;
 }
 
-void mat4_perspective(mat4 *out, float fov, float aspect, float near,
+void mat4_perspective(mat4 *out, float fov_rad, float aspect, float near,
                       float far) {
     mat4_identity(out);
-    float inv_tan_half_fov = 1.0f / tanf(fov * 0.5f);
+    float inv_tan_half_fov = 1.0f / tanf(fov_rad * 0.5f);
 
     out->m[0] = inv_tan_half_fov / aspect;
     out->m[5] = inv_tan_half_fov;
