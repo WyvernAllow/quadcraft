@@ -1,6 +1,8 @@
 #include <SDL3/SDL.h>
 #include <stdlib.h>
 
+#include "lmath.h"
+
 #define ARRAY_LENGTH(x) (sizeof(x) / sizeof((x)[0]))
 
 typedef struct vertex {
@@ -9,7 +11,7 @@ typedef struct vertex {
 } vertex;
 
 SDL_GPUShader *load_shader(SDL_GPUDevice *device, const char *filename,
-                           SDL_GPUShaderStage stage) {
+                           SDL_GPUShaderStage stage, size_t num_uniforms) {
     size_t code_size;
     const uint8_t *code = SDL_LoadFile(filename, &code_size);
     if (!code) {
@@ -23,6 +25,7 @@ SDL_GPUShader *load_shader(SDL_GPUDevice *device, const char *filename,
         .entrypoint = "main",
         .format = SDL_GPU_SHADERFORMAT_SPIRV,
         .stage = stage,
+        .num_uniform_buffers = num_uniforms,
     };
 
     SDL_GPUShader *shader = SDL_CreateGPUShader(device, &shader_info);
@@ -37,14 +40,14 @@ SDL_GPUShader *load_shader(SDL_GPUDevice *device, const char *filename,
 SDL_GPUGraphicsPipeline *create_pipeline(SDL_GPUDevice *device,
                                          SDL_Window *window) {
     SDL_GPUShader *vert = load_shader(device, "res/shaders/main.vert.spv",
-                                      SDL_GPU_SHADERSTAGE_VERTEX);
+                                      SDL_GPU_SHADERSTAGE_VERTEX, 1);
     if (!vert) {
         SDL_Log("Failed to load vertex shader");
         return NULL;
     }
 
     SDL_GPUShader *frag = load_shader(device, "res/shaders/main.frag.spv",
-                                      SDL_GPU_SHADERSTAGE_FRAGMENT);
+                                      SDL_GPU_SHADERSTAGE_FRAGMENT, 0);
     if (!frag) {
         SDL_Log("Failed to load fragment shader");
         return NULL;
@@ -148,6 +151,16 @@ int main() {
 
     const size_t index_count = ARRAY_LENGTH(indices);
 
+    mat4 proj;
+    mat4_perspective(&proj, 1.5f, 800.0f / 450.0f, 0.01f, 1000.0f);
+
+    mat4 view;
+    mat4_lookat(&view, (vec3){0.0f, 0.0f, 3.0f}, (vec3){0.0f, 0.0f, 0.0f},
+                (vec3){0.0f, 1.0f, 0.0f});
+
+    mat4 mvp;
+    mat4_mul(&mvp, &proj, &view);
+
     SDL_GPUBuffer *vertex_buffer =
         SDL_CreateGPUBuffer(device, &(SDL_GPUBufferCreateInfo){
                                         .usage = SDL_GPU_BUFFERUSAGE_VERTEX,
@@ -234,10 +247,12 @@ int main() {
 
         SDL_GPUColorTargetInfo color_target_info = {
             .texture = swapchain_tex,
-            .clear_color = (SDL_FColor){0.1f, 0.1f, 0.1f, 1.0f},
+            .clear_color = (SDL_FColor){0.015f, 0.015f, 0.015f, 1.0f},
             .load_op = SDL_GPU_LOADOP_CLEAR,
             .store_op = SDL_GPU_STOREOP_STORE,
         };
+
+        SDL_PushGPUVertexUniformData(cmdbuf, 0, mvp.m, sizeof(float) * 16);
 
         SDL_GPURenderPass *render_pass =
             SDL_BeginGPURenderPass(cmdbuf, &color_target_info, 1, NULL);
