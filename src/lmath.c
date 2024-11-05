@@ -10,6 +10,11 @@ float rad_to_deg(float radians) {
     return radians * (180.0f / M_PI);
 }
 
+float clamp(float value, float min, float max) {
+    const double t = value < min ? min : value;
+    return t > max ? max : t;
+}
+
 vec3 vec3_add(vec3 a, vec3 b) {
     vec3 result = {
         .x = a.x + b.x,

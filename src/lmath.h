@@ -7,6 +7,7 @@
 
 float deg_to_rad(float degrees);
 float rad_to_deg(float radians);
+float clamp(float value, float min, float max);
 
 typedef struct vec3 {
     float x;

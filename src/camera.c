@@ -20,6 +20,9 @@ void camera_init(camera *cam, float fov_deg, float aspect, float near,
 }
 
 void camera_update(camera *cam) {
+    /* Pitch values of 90 degrees up or down cause gimbal lock. */
+    cam->pitch = clamp(cam->pitch, -89.999f, 89.999f);
+
     vec3 forward;
     forward.x = cosf(deg_to_rad(cam->yaw)) * cosf(deg_to_rad(cam->pitch));
     forward.y = sinf(deg_to_rad(cam->pitch));
