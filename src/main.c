@@ -8,10 +8,10 @@
 
 #define ARRAY_LEN(x) (sizeof(x) / sizeof((x)[0]))
 
-typedef struct vertex {
+typedef struct chunk_vertex {
     vec3 position;
     vec3 normal;
-} vertex;
+} chunk_vertex;
 
 typedef enum direction {
     DIR_POS_X,
@@ -99,7 +99,7 @@ SDL_GPUGraphicsPipeline *create_pipeline(SDL_GPUDevice *device,
             .slot = 0,
             .input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX,
             .instance_step_rate = 0,
-            .pitch = sizeof(vertex),
+            .pitch = sizeof(chunk_vertex),
         }};
 
     SDL_GPUVertexAttribute vertex_attributes[] = {
@@ -107,13 +107,13 @@ SDL_GPUGraphicsPipeline *create_pipeline(SDL_GPUDevice *device,
         (SDL_GPUVertexAttribute){.buffer_slot = 0,
                                  .location = 0,
                                  .format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3,
-                                 .offset = offsetof(vertex, position)},
+                                 .offset = offsetof(chunk_vertex, position)},
 
         /* Normal attribute */
         (SDL_GPUVertexAttribute){.buffer_slot = 0,
                                  .location = 1,
                                  .format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3,
-                                 .offset = offsetof(vertex, normal)}};
+                                 .offset = offsetof(chunk_vertex, normal)}};
 
     info.vertex_input_state = (SDL_GPUVertexInputState){
         .vertex_buffer_descriptions = vertex_buffer_descriptions,
@@ -160,28 +160,22 @@ SDL_GPUTexture *create_depth_texture(SDL_GPUDevice *device, uint32_t width,
 #define MAX_VERTS (MAX_QUADS * 4)
 #define MAX_INDICES (MAX_QUADS * 6)
 
-vertex vertices[MAX_VERTS];
-size_t vertex_count = 0;
+typedef struct chunk_mesh {
+    chunk_vertex *vertices;
+    size_t vertex_count;
 
-uint16_t indices[MAX_INDICES];
-size_t index_count = 0;
+    uint16_t *indices;
+    size_t index_count;
+} chunk_mesh;
 
-void calculate_tangent_bitangent(vec3 normal, vec3 *tangent, vec3 *bitangent) {
+void append_quad(chunk_mesh *mesh, vec3 offset, vec3 normal) {
     vec3 up = {0.0f, 1.0f, 0.0f};
     if (fabsf(normal.y) > 0.9f) {
         up = (vec3){1.0f, 0.0f, 0.0f};
     }
 
-    *tangent = vec3_norm(vec3_cross(up, normal));
-    *bitangent = vec3_cross(normal, *tangent);
-}
-
-void append_quad(vec3 offset, vec3 normal) {
-    if (vertex_count + 4 >= MAX_VERTS || index_count + 6 >= MAX_INDICES)
-        return;
-
-    vec3 tangent, bitangent;
-    calculate_tangent_bitangent(normal, &tangent, &bitangent);
+    vec3 tangent = vec3_norm(vec3_cross(up, normal));
+    vec3 bitangent = vec3_cross(normal, tangent);
 
     vec3 positions[4] = {
         vec3_add(offset, vec3_add(vec3_scale(tangent, -0.5f),
@@ -194,21 +188,43 @@ void append_quad(vec3 offset, vec3 normal) {
                                   vec3_scale(bitangent, 0.5f))),
     };
 
-    size_t base_index = vertex_count;
+    size_t base_index = mesh->vertex_count;
     for (int i = 0; i < 4; i++) {
-        vertices[vertex_count].position =
+        mesh->vertices[mesh->vertex_count].position =
             vec3_add(positions[i], (vec3){0.5f, 0.5f, 0.5f});
-        vertices[vertex_count].normal = normal;
-        vertex_count++;
+        mesh->vertices[mesh->vertex_count].normal = normal;
+        mesh->vertex_count++;
     }
 
-    indices[index_count++] = base_index;
-    indices[index_count++] = base_index + 1;
-    indices[index_count++] = base_index + 2;
+    mesh->indices[mesh->index_count++] = base_index + 0;
+    mesh->indices[mesh->index_count++] = base_index + 1;
+    mesh->indices[mesh->index_count++] = base_index + 2;
+    mesh->indices[mesh->index_count++] = base_index + 0;
+    mesh->indices[mesh->index_count++] = base_index + 2;
+    mesh->indices[mesh->index_count++] = base_index + 3;
+}
 
-    indices[index_count++] = base_index;
-    indices[index_count++] = base_index + 2;
-    indices[index_count++] = base_index + 3;
+void chunk_generate_mesh(const chunk *chunk, chunk_mesh *mesh) {
+    for (int z = 0; z < CHUNK_SIZE; z++) {
+        for (int x = 0; x < CHUNK_SIZE; x++) {
+            for (int y = 0; y < CHUNK_SIZE; y++) {
+                for (direction d = 0; d < DIR_COUNT; d++) {
+                    vec3 position = {x, y, z};
+                    vec3 normal = normal_lut[d];
+                    vec3 adjacent = vec3_add(position, normal);
+
+                    block_type compare_block =
+                        chunk_get_block(chunk, (int)adjacent.x, (int)adjacent.y,
+                                        (int)adjacent.z);
+                    if (compare_block == BLOCK_AIR) {
+                        append_quad(mesh,
+                                    vec3_add(vec3_scale(normal, 0.5), position),
+                                    normal);
+                    }
+                }
+            }
+        }
+    }
 }
 
 int main(void) {
@@ -259,31 +275,8 @@ int main(void) {
     chunk chunk;
     chunk_init(&chunk);
 
-    for (int z = 0; z < CHUNK_SIZE; z++) {
-        for (int x = 0; x < CHUNK_SIZE; x++) {
-            for (int y = 0; y < CHUNK_SIZE; y++) {
-                for (direction d = 0; d < DIR_COUNT; d++) {
-                    vec3 normal = normal_lut[d];
-                    int check_x = x + normal.x;
-                    int check_y = y + normal.y;
-                    int check_z = z + normal.z;
-
-                    block_type compare_block =
-                        chunk_get_block(&chunk, check_x, check_y, check_z);
-                    if (compare_block == BLOCK_AIR) {
-                        append_quad(
-                            vec3_add(vec3_scale(normal, 0.5), (vec3){x, y, z}),
-                            normal);
-                    }
-                }
-            }
-        }
-    }
-
     camera cam;
     camera_init(&cam, 90.0f, 800.0f / 450.0f, 0.01f, 1000.0f);
-
-    cam.position.z = 0.0f;
 
     SDL_GPUSampler *sampler = SDL_CreateGPUSampler(
         device, &(SDL_GPUSamplerCreateInfo){
@@ -295,29 +288,34 @@ int main(void) {
                     .address_mode_w = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE,
                 });
 
-    SDL_GPUBuffer *vertex_buffer =
-        SDL_CreateGPUBuffer(device, &(SDL_GPUBufferCreateInfo){
-                                        .usage = SDL_GPU_BUFFERUSAGE_VERTEX,
-                                        .size = sizeof(vertex) * vertex_count,
-                                    });
+    SDL_GPUBuffer *vertex_buffer = SDL_CreateGPUBuffer(
+        device, &(SDL_GPUBufferCreateInfo){
+                    .usage = SDL_GPU_BUFFERUSAGE_VERTEX,
+                    .size = sizeof(chunk_vertex) * MAX_VERTS,
+                });
 
     SDL_GPUBuffer *index_buffer =
         SDL_CreateGPUBuffer(device, &(SDL_GPUBufferCreateInfo){
                                         .usage = SDL_GPU_BUFFERUSAGE_INDEX,
-                                        .size = sizeof(uint16_t) * index_count,
+                                        .size = sizeof(uint16_t) * MAX_INDICES,
                                     });
 
     SDL_GPUTransferBuffer *buffer_trans_buffer = SDL_CreateGPUTransferBuffer(
         device, &(SDL_GPUTransferBufferCreateInfo){
                     .usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD,
-                    .size = sizeof(vertex) * vertex_count +
-                            sizeof(uint16_t) * index_count,
+                    .size = sizeof(chunk_vertex) * MAX_VERTS +
+                            sizeof(uint16_t) * MAX_INDICES,
                 });
 
-    void *data = SDL_MapGPUTransferBuffer(device, buffer_trans_buffer, false);
-    memcpy(data, vertices, sizeof(vertex) * vertex_count);
-    memcpy(data + sizeof(vertex) * vertex_count, indices,
-           sizeof(uint16_t) * index_count);
+    uint8_t *data =
+        SDL_MapGPUTransferBuffer(device, buffer_trans_buffer, false);
+
+    chunk_mesh mesh = {0};
+    mesh.vertices = (chunk_vertex *)data;
+    mesh.indices = (uint16_t *)(data + sizeof(chunk_vertex) * MAX_VERTS);
+
+    chunk_generate_mesh(&chunk, &mesh);
+
     SDL_UnmapGPUTransferBuffer(device, buffer_trans_buffer);
 
     SDL_GPUTexture *texture = SDL_CreateGPUTexture(
@@ -349,18 +347,18 @@ int main(void) {
         &(SDL_GPUBufferRegion){
             .buffer = vertex_buffer,
             .offset = 0,
-            .size = sizeof(vertex) * vertex_count,
+            .size = sizeof(chunk_vertex) * mesh.vertex_count,
         },
         false);
 
     SDL_UploadToGPUBuffer(copy_pass,
                           &(SDL_GPUTransferBufferLocation){
                               .transfer_buffer = buffer_trans_buffer,
-                              .offset = sizeof(vertex) * vertex_count},
+                              .offset = sizeof(chunk_vertex) * MAX_VERTS},
                           &(SDL_GPUBufferRegion){
                               .buffer = index_buffer,
                               .offset = 0,
-                              .size = sizeof(uint16_t) * index_count,
+                              .size = sizeof(uint16_t) * mesh.index_count,
                           },
                           false);
 
@@ -516,7 +514,7 @@ int main(void) {
                                         .texture = texture, .sampler = sampler},
                                     1);
 
-        SDL_DrawGPUIndexedPrimitives(render_pass, index_count, 1, 0, 0, 0);
+        SDL_DrawGPUIndexedPrimitives(render_pass, mesh.index_count, 1, 0, 0, 0);
 
         SDL_EndGPURenderPass(render_pass);
 
