@@ -13,7 +13,8 @@ typedef struct vertex {
 } vertex;
 
 SDL_GPUShader *load_shader(SDL_GPUDevice *device, const char *filename,
-                           SDL_GPUShaderStage stage, size_t num_uniforms) {
+                           SDL_GPUShaderStage stage, size_t num_uniforms,
+                           size_t num_samplers) {
     size_t code_size;
     const uint8_t *code = SDL_LoadFile(filename, &code_size);
     if (!code) {
@@ -28,6 +29,7 @@ SDL_GPUShader *load_shader(SDL_GPUDevice *device, const char *filename,
         .format = SDL_GPU_SHADERFORMAT_SPIRV,
         .stage = stage,
         .num_uniform_buffers = num_uniforms,
+        .num_samplers = num_samplers,
     };
 
     SDL_GPUShader *shader = SDL_CreateGPUShader(device, &shader_info);
@@ -42,14 +44,14 @@ SDL_GPUShader *load_shader(SDL_GPUDevice *device, const char *filename,
 SDL_GPUGraphicsPipeline *create_pipeline(SDL_GPUDevice *device,
                                          SDL_Window *window) {
     SDL_GPUShader *vert = load_shader(device, "res/shaders/main.vert.spv",
-                                      SDL_GPU_SHADERSTAGE_VERTEX, 1);
+                                      SDL_GPU_SHADERSTAGE_VERTEX, 1, 0);
     if (!vert) {
         SDL_Log("Failed to load vertex shader");
         return NULL;
     }
 
     SDL_GPUShader *frag = load_shader(device, "res/shaders/main.frag.spv",
-                                      SDL_GPU_SHADERSTAGE_FRAGMENT, 0);
+                                      SDL_GPU_SHADERSTAGE_FRAGMENT, 0, 1);
     if (!frag) {
         SDL_Log("Failed to load fragment shader");
         return NULL;
@@ -130,6 +132,14 @@ int main() {
 
     SDL_SetWindowRelativeMouseMode(window, true);
 
+    SDL_Surface *surface = SDL_LoadBMP("res/textures/stone.bmp");
+    if (!surface) {
+        SDL_Log("SDL_LoadBMP failed: %s\n", SDL_GetError());
+        return EXIT_FAILURE;
+    }
+
+    surface = SDL_ConvertSurface(surface, SDL_PIXELFORMAT_ABGR8888);
+
     SDL_GPUDevice *device =
         SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV, true, NULL);
     if (!device) {
@@ -169,6 +179,16 @@ int main() {
 
     cam.position.z = 1.0f;
 
+    SDL_GPUSampler *sampler = SDL_CreateGPUSampler(
+        device, &(SDL_GPUSamplerCreateInfo){
+                    .min_filter = SDL_GPU_FILTER_NEAREST,
+                    .mag_filter = SDL_GPU_FILTER_NEAREST,
+                    .mipmap_mode = SDL_GPU_SAMPLERMIPMAPMODE_NEAREST,
+                    .address_mode_u = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE,
+                    .address_mode_v = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE,
+                    .address_mode_w = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE,
+                });
+
     SDL_GPUBuffer *vertex_buffer =
         SDL_CreateGPUBuffer(device, &(SDL_GPUBufferCreateInfo){
                                         .usage = SDL_GPU_BUFFERUSAGE_VERTEX,
@@ -193,6 +213,25 @@ int main() {
     memcpy(data + sizeof(vertex) * vertex_count, indices,
            sizeof(uint16_t) * index_count);
     SDL_UnmapGPUTransferBuffer(device, buffer_trans_buffer);
+
+    SDL_GPUTexture *texture = SDL_CreateGPUTexture(
+        device, &(SDL_GPUTextureCreateInfo){
+                    .format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,
+                    .width = surface->w,
+                    .height = surface->h,
+                    .layer_count_or_depth = 1,
+                    .num_levels = 1,
+                    .usage = SDL_GPU_TEXTUREUSAGE_SAMPLER,
+                });
+
+    SDL_GPUTransferBuffer *texture_trans_buf = SDL_CreateGPUTransferBuffer(
+        device, &(SDL_GPUTransferBufferCreateInfo){
+                    .usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD,
+                    .size = surface->w * surface->h * 4});
+
+    void *texels = SDL_MapGPUTransferBuffer(device, texture_trans_buf, false);
+    memcpy(texels, surface->pixels, surface->w * surface->h * 4);
+    SDL_UnmapGPUTransferBuffer(device, texture_trans_buf);
 
     SDL_GPUCommandBuffer *upload_cmdbuf = SDL_AcquireGPUCommandBuffer(device);
     SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(upload_cmdbuf);
@@ -219,9 +258,20 @@ int main() {
                           },
                           false);
 
+    SDL_UploadToGPUTexture(
+        copy_pass,
+        &(SDL_GPUTextureTransferInfo){
+            .transfer_buffer = texture_trans_buf,
+            .offset = 0,
+        },
+        &(SDL_GPUTextureRegion){
+            .texture = texture, .w = surface->w, .h = surface->h, .d = 1},
+        false);
+
     SDL_EndGPUCopyPass(copy_pass);
     SDL_SubmitGPUCommandBuffer(upload_cmdbuf);
     SDL_ReleaseGPUTransferBuffer(device, buffer_trans_buffer);
+    SDL_ReleaseGPUTransferBuffer(device, texture_trans_buf);
 
     float current_time = SDL_GetTicks() / 1000.0f;
     float last_time = current_time;
@@ -328,6 +378,9 @@ int main() {
             render_pass,
             &(SDL_GPUBufferBinding){.buffer = index_buffer, .offset = 0},
             SDL_GPU_INDEXELEMENTSIZE_16BIT);
+
+        SDL_BindGPUFragmentSamplers(render_pass, 0, &(SDL_GPUTextureSamplerBinding){.texture = texture, .sampler = sampler}, 1);
+
         SDL_DrawGPUIndexedPrimitives(render_pass, index_count, 1, 0, 0, 0);
 
         SDL_EndGPURenderPass(render_pass);
@@ -338,6 +391,8 @@ int main() {
     SDL_ReleaseGPUGraphicsPipeline(device, pipeline);
     SDL_ReleaseGPUBuffer(device, index_buffer);
     SDL_ReleaseGPUBuffer(device, vertex_buffer);
+    SDL_ReleaseGPUTexture(device, texture);
+    SDL_ReleaseGPUSampler(device, sampler);
     SDL_DestroyGPUDevice(device);
     SDL_DestroyWindow(window);
     SDL_Quit();

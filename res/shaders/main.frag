@@ -5,6 +5,8 @@ layout (location = 1) in vec2 v_uv;
 
 layout (location = 0) out vec4 v_frag;
 
+layout (set = 2, binding = 0) uniform sampler2D u_sampler;
+
 void main() {
-    v_frag = vec4(v_uv, 0.0, 1.0);
+    v_frag = texture(u_sampler, v_uv);
 }
