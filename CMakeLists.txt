@@ -7,6 +7,9 @@ add_executable(${PROJECT_NAME}
     src/lmath.h
     src/camera.c
     src/camera.h
+    src/block_type.h
+    src/chunk.h
+    src/chunk.c
 )
 
 set(SDL_SHARED OFF)
