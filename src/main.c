@@ -9,10 +9,29 @@
 #define ARRAY_LENGTH(x) (sizeof(x) / sizeof((x)[0]))
 
 typedef struct vertex {
-    float position[3];
-    float color[3];
-    float uv[2];
+    vec3 position;
+    vec3 normal;
 } vertex;
+
+typedef enum direction {
+    DIR_POS_X,
+    DIR_POS_Y,
+    DIR_POS_Z,
+    DIR_NEG_X,
+    DIR_NEG_Y,
+    DIR_NEG_Z,
+
+    DIR_COUNT,
+} direction;
+
+vec3 normal_lut[DIR_COUNT] = {
+    [DIR_POS_X] = (vec3){1.0f, 0.0f, 0.0f},
+    [DIR_POS_Y] = (vec3){0.0f, 1.0f, 0.0f},
+    [DIR_POS_Z] = (vec3){0.0f, 0.0f, 1.0f},
+    [DIR_NEG_X] = (vec3){-1.0f, 0.0f, 0.0f},
+    [DIR_NEG_Y] = (vec3){0.0f, -1.0f, 0.0f},
+    [DIR_NEG_Z] = (vec3){0.0f, 0.0f, -1.0f},
+};
 
 SDL_GPUShader *load_shader(SDL_GPUDevice *device, const char *filename,
                            SDL_GPUShaderStage stage, size_t num_uniforms,
@@ -24,15 +43,14 @@ SDL_GPUShader *load_shader(SDL_GPUDevice *device, const char *filename,
         return NULL;
     }
 
-    const SDL_GPUShaderCreateInfo shader_info = {
-        .code = code,
-        .code_size = code_size,
-        .entrypoint = "main",
-        .format = SDL_GPU_SHADERFORMAT_SPIRV,
-        .stage = stage,
-        .num_uniform_buffers = num_uniforms,
-        .num_samplers = num_samplers,
-    };
+    SDL_GPUShaderCreateInfo shader_info = {0};
+    shader_info.code = code;
+    shader_info.code_size = code_size;
+    shader_info.entrypoint = "main";
+    shader_info.format = SDL_GPU_SHADERFORMAT_SPIRV;
+    shader_info.stage = stage;
+    shader_info.num_uniform_buffers = num_uniforms;
+    shader_info.num_samplers = num_samplers;
 
     SDL_GPUShader *shader = SDL_CreateGPUShader(device, &shader_info);
     if (!shader) {
@@ -89,7 +107,7 @@ SDL_GPUGraphicsPipeline *create_pipeline(SDL_GPUDevice *device,
                             .instance_step_rate = 0,
                             .pitch = sizeof(vertex),
                         }},
-                .num_vertex_attributes = 3,
+                .num_vertex_attributes = 2,
                 .vertex_attributes =
                     (SDL_GPUVertexAttribute[]){
                         (SDL_GPUVertexAttribute){
@@ -102,13 +120,7 @@ SDL_GPUGraphicsPipeline *create_pipeline(SDL_GPUDevice *device,
                             .buffer_slot = 0,
                             .location = 1,
                             .format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3,
-                            .offset = offsetof(vertex, color),
-                        },
-                        (SDL_GPUVertexAttribute){
-                            .buffer_slot = 0,
-                            .location = 2,
-                            .format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2,
-                            .offset = offsetof(vertex, uv),
+                            .offset = offsetof(vertex, normal),
                         },
                     }},
 
@@ -131,6 +143,22 @@ SDL_GPUGraphicsPipeline *create_pipeline(SDL_GPUDevice *device,
     SDL_ReleaseGPUShader(device, frag);
 
     return pipeline;
+}
+
+SDL_GPUTexture *create_depth_texture(SDL_GPUDevice *device, uint32_t width,
+                                     uint32_t height) {
+    const SDL_GPUTextureCreateInfo info = {
+        .type = SDL_GPU_TEXTURETYPE_2D,
+        .format = SDL_GPU_TEXTUREFORMAT_D16_UNORM,
+        .width = width,
+        .height = height,
+        .layer_count_or_depth = 1,
+        .num_levels = 1,
+        .sample_count = SDL_GPU_SAMPLECOUNT_1,
+        .usage = SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET,
+    };
+
+    return SDL_CreateGPUTexture(device, &info);
 }
 
 #define MAX_QUADS (CHUNK_VOLUME * 6)
@@ -171,20 +199,11 @@ void append_quad(vec3 offset, vec3 normal) {
                                   vec3_scale(bitangent, 0.5f))),
     };
 
-    float uvs[4][2] = {{0.0f, 0.0f}, {1.0f, 0.0f}, {1.0f, 1.0f}, {0.0f, 1.0f}};
-
-    float color[3] = {1.0f, 1.0f, 1.0f};
-
     size_t base_index = vertex_count;
     for (int i = 0; i < 4; i++) {
-        vertices[vertex_count].position[0] = positions[i].x;
-        vertices[vertex_count].position[1] = positions[i].y;
-        vertices[vertex_count].position[2] = positions[i].z;
-        vertices[vertex_count].color[0] = color[0];
-        vertices[vertex_count].color[1] = color[1];
-        vertices[vertex_count].color[2] = color[2];
-        vertices[vertex_count].uv[0] = uvs[i][0];
-        vertices[vertex_count].uv[1] = uvs[i][1];
+        vertices[vertex_count].position =
+            vec3_add(positions[i], (vec3){0.5f, 0.5f, 0.5f});
+        vertices[vertex_count].normal = normal;
         vertex_count++;
     }
 
@@ -197,7 +216,7 @@ void append_quad(vec3 offset, vec3 normal) {
     indices[index_count++] = base_index + 3;
 }
 
-int main() {
+int main(void) {
     if (!SDL_Init(SDL_INIT_VIDEO)) {
         SDL_Log("SDL_Init failed: %s\n", SDL_GetError());
         return EXIT_FAILURE;
@@ -242,33 +261,13 @@ int main() {
         return EXIT_FAILURE;
     }
 
-    typedef enum direction {
-        DIR_POS_X,
-        DIR_POS_Y,
-        DIR_POS_Z,
-        DIR_NEG_X,
-        DIR_NEG_Y,
-        DIR_NEG_Z,
-
-        NUM_DIRS,
-    } direction;
-
-    vec3 normal_lut[6] = {
-        [DIR_POS_X] = (vec3){1.0f, 0.0f, 0.0f},
-        [DIR_POS_Y] = (vec3){0.0f, 1.0f, 0.0f},
-        [DIR_POS_Z] = (vec3){0.0f, 0.0f, 1.0f},
-        [DIR_NEG_X] = (vec3){-1.0f, 0.0f, 0.0f},
-        [DIR_NEG_Y] = (vec3){0.0f, -1.0f, 0.0f},
-        [DIR_NEG_Z] = (vec3){0.0f, 0.0f, -1.0f},
-    };
-
     chunk chunk;
     chunk_init(&chunk);
 
     for (int z = 0; z < CHUNK_SIZE; z++) {
         for (int x = 0; x < CHUNK_SIZE; x++) {
             for (int y = 0; y < CHUNK_SIZE; y++) {
-                for (direction d = 0; d < NUM_DIRS; d++) {
+                for (direction d = 0; d < DIR_COUNT; d++) {
                     vec3 normal = normal_lut[d];
                     int check_x = x + normal.x;
                     int check_y = y + normal.y;
@@ -289,7 +288,7 @@ int main() {
     camera cam;
     camera_init(&cam, 90.0f, 800.0f / 450.0f, 0.01f, 1000.0f);
 
-    cam.position.z = 1.0f;
+    cam.position.z = 0.0f;
 
     SDL_GPUSampler *sampler = SDL_CreateGPUSampler(
         device, &(SDL_GPUSamplerCreateInfo){
@@ -385,17 +384,7 @@ int main() {
     SDL_ReleaseGPUTransferBuffer(device, buffer_trans_buffer);
     SDL_ReleaseGPUTransferBuffer(device, texture_trans_buf);
 
-    SDL_GPUTexture *depth = SDL_CreateGPUTexture(
-        device, &(SDL_GPUTextureCreateInfo){
-                    .type = SDL_GPU_TEXTURETYPE_2D,
-                    .format = SDL_GPU_TEXTUREFORMAT_D16_UNORM,
-                    .width = 800,
-                    .height = 450,
-                    .layer_count_or_depth = 1,
-                    .num_levels = 1,
-                    .sample_count = SDL_GPU_SAMPLECOUNT_1,
-                    .usage = SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET,
-                });
+    SDL_GPUTexture *depth = create_depth_texture(device, 800, 450);
 
     float current_time = SDL_GetTicks() / 1000.0f;
     float last_time = current_time;
@@ -460,7 +449,7 @@ int main() {
         }
 
         cam.position = vec3_add(
-            cam.position, vec3_scale(vec3_norm(wishdir), 5.0f * delta_time));
+            cam.position, vec3_scale(vec3_norm(wishdir), 6.0f * delta_time));
 
         camera_update(&cam);
 
@@ -483,18 +472,7 @@ int main() {
         if (old_h != new_h || new_w != old_w) {
             SDL_ReleaseGPUTexture(device, depth);
 
-            depth = SDL_CreateGPUTexture(
-                device, &(SDL_GPUTextureCreateInfo){
-                            .type = SDL_GPU_TEXTURETYPE_2D,
-                            .format = SDL_GPU_TEXTUREFORMAT_D16_UNORM,
-                            .width = new_w,
-                            .height = new_h,
-                            .layer_count_or_depth = 1,
-                            .num_levels = 1,
-                            .sample_count = SDL_GPU_SAMPLECOUNT_1,
-                            .usage = SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET,
-                        });
-
+            depth = create_depth_texture(device, new_w, new_h);
             SDL_Log("Creating new depth texture");
         }
 
@@ -502,7 +480,7 @@ int main() {
         old_h = new_h;
 
         if (!swapchain_tex) {
-            SDL_SubmitGPUCommandBuffer(cmdbuf);
+            SDL_CancelGPUCommandBuffer(cmdbuf);
             continue;
         }
 
