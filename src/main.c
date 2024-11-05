@@ -6,7 +6,7 @@
 #include "chunk.h"
 #include "lmath.h"
 
-#define ARRAY_LENGTH(x) (sizeof(x) / sizeof((x)[0]))
+#define ARRAY_LEN(x) (sizeof(x) / sizeof((x)[0]))
 
 typedef struct vertex {
     vec3 position;
@@ -77,63 +77,59 @@ SDL_GPUGraphicsPipeline *create_pipeline(SDL_GPUDevice *device,
         return NULL;
     }
 
-    const SDL_GPUGraphicsPipelineCreateInfo pipeline_info = {
-        .target_info =
-            {.num_color_targets = 1,
-             .color_target_descriptions = (SDL_GPUColorTargetDescription[]){(
-                 SDL_GPUColorTargetDescription){
-                 .format = SDL_GetGPUSwapchainTextureFormat(device, window)}},
+    SDL_GPUGraphicsPipelineCreateInfo info = {0};
 
-             .has_depth_stencil_target = true,
-             .depth_stencil_format = SDL_GPU_TEXTUREFORMAT_D16_UNORM},
+    SDL_GPUColorTargetDescription color_target_descriptions[] = {
+        (SDL_GPUColorTargetDescription){
+            .format = SDL_GetGPUSwapchainTextureFormat(device, window)}};
 
-        .depth_stencil_state =
-            (SDL_GPUDepthStencilState){
-                .enable_depth_test = true,
-                .enable_depth_write = true,
-                .compare_op = SDL_GPU_COMPAREOP_LESS_OR_EQUAL,
-            },
+    info.target_info.num_color_targets = ARRAY_LEN(color_target_descriptions);
+    info.target_info.color_target_descriptions = color_target_descriptions;
 
-        .multisample_state.sample_count = SDL_GPU_SAMPLECOUNT_1,
+    info.target_info.has_depth_stencil_target = true;
+    info.target_info.depth_stencil_format = SDL_GPU_TEXTUREFORMAT_D16_UNORM;
+    info.depth_stencil_state.enable_depth_test = true;
+    info.depth_stencil_state.enable_depth_write = true;
+    info.depth_stencil_state.compare_op = SDL_GPU_COMPAREOP_LESS_OR_EQUAL;
 
-        .vertex_input_state =
-            (SDL_GPUVertexInputState){
-                .num_vertex_buffers = 1,
-                .vertex_buffer_descriptions =
-                    (SDL_GPUVertexBufferDescription[]){
-                        (SDL_GPUVertexBufferDescription){
-                            .slot = 0,
-                            .input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX,
-                            .instance_step_rate = 0,
-                            .pitch = sizeof(vertex),
-                        }},
-                .num_vertex_attributes = 2,
-                .vertex_attributes =
-                    (SDL_GPUVertexAttribute[]){
-                        (SDL_GPUVertexAttribute){
-                            .buffer_slot = 0,
-                            .location = 0,
-                            .format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3,
-                            .offset = offsetof(vertex, position),
-                        },
-                        (SDL_GPUVertexAttribute){
-                            .buffer_slot = 0,
-                            .location = 1,
-                            .format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3,
-                            .offset = offsetof(vertex, normal),
-                        },
-                    }},
+    info.multisample_state.sample_count = SDL_GPU_SAMPLECOUNT_1;
 
-        .primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST,
-        .vertex_shader = vert,
-        .fragment_shader = frag,
-        .rasterizer_state.fill_mode = SDL_GPU_FILLMODE_FILL,
-        .rasterizer_state.cull_mode = SDL_GPU_CULLMODE_BACK,
-        .rasterizer_state.front_face = SDL_GPU_FRONTFACE_COUNTER_CLOCKWISE,
-    };
+    SDL_GPUVertexBufferDescription vertex_buffer_descriptions[] = {
+        (SDL_GPUVertexBufferDescription){
+            .slot = 0,
+            .input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX,
+            .instance_step_rate = 0,
+            .pitch = sizeof(vertex),
+        }};
+
+    SDL_GPUVertexAttribute vertex_attributes[] = {
+        /* Position attribute */
+        (SDL_GPUVertexAttribute){.buffer_slot = 0,
+                                 .location = 0,
+                                 .format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3,
+                                 .offset = offsetof(vertex, position)},
+
+        /* Normal attribute */
+        (SDL_GPUVertexAttribute){.buffer_slot = 0,
+                                 .location = 1,
+                                 .format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3,
+                                 .offset = offsetof(vertex, normal)}};
+
+    info.vertex_input_state = (SDL_GPUVertexInputState){
+        .vertex_buffer_descriptions = vertex_buffer_descriptions,
+        .num_vertex_buffers = ARRAY_LEN(vertex_buffer_descriptions),
+        .vertex_attributes = vertex_attributes,
+        .num_vertex_attributes = ARRAY_LEN(vertex_attributes)};
+
+    info.primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
+    info.vertex_shader = vert;
+    info.fragment_shader = frag;
+    info.rasterizer_state.fill_mode = SDL_GPU_FILLMODE_FILL;
+    info.rasterizer_state.cull_mode = SDL_GPU_CULLMODE_BACK;
+    info.rasterizer_state.front_face = SDL_GPU_FRONTFACE_COUNTER_CLOCKWISE;
 
     SDL_GPUGraphicsPipeline *pipeline =
-        SDL_CreateGPUGraphicsPipeline(device, &pipeline_info);
+        SDL_CreateGPUGraphicsPipeline(device, &info);
     if (!pipeline) {
         SDL_Log("SDL_CreateGPUGraphicsPipeline failed: %s\n", SDL_GetError());
         return NULL;
@@ -147,16 +143,15 @@ SDL_GPUGraphicsPipeline *create_pipeline(SDL_GPUDevice *device,
 
 SDL_GPUTexture *create_depth_texture(SDL_GPUDevice *device, uint32_t width,
                                      uint32_t height) {
-    const SDL_GPUTextureCreateInfo info = {
-        .type = SDL_GPU_TEXTURETYPE_2D,
-        .format = SDL_GPU_TEXTUREFORMAT_D16_UNORM,
-        .width = width,
-        .height = height,
-        .layer_count_or_depth = 1,
-        .num_levels = 1,
-        .sample_count = SDL_GPU_SAMPLECOUNT_1,
-        .usage = SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET,
-    };
+    SDL_GPUTextureCreateInfo info = {0};
+    info.type = SDL_GPU_TEXTURETYPE_2D;
+    info.format = SDL_GPU_TEXTUREFORMAT_D16_UNORM;
+    info.width = width;
+    info.height = height;
+    info.layer_count_or_depth = 1;
+    info.num_levels = 1;
+    info.sample_count = SDL_GPU_SAMPLECOUNT_1;
+    info.usage = SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET;
 
     return SDL_CreateGPUTexture(device, &info);
 }
