@@ -12,6 +12,12 @@ add_executable(${PROJECT_NAME}
     src/chunk.c
 )
 
+if(MSVC)
+    target_compile_options(${PROJECT_NAME} PRIVATE /W4)
+else()
+    target_compile_options(${PROJECT_NAME} PRIVATE -std=c99 -pedantic -Wall -Wextra)
+endif()
+
 set(SDL_SHARED OFF)
 set(SDL_STATIC ON)
 add_subdirectory(deps/SDL)
