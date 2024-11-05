@@ -9,6 +9,7 @@
 typedef struct vertex {
     float position[3];
     float color[3];
+    float uv[2];
 } vertex;
 
 SDL_GPUShader *load_shader(SDL_GPUDevice *device, const char *filename,
@@ -73,7 +74,7 @@ SDL_GPUGraphicsPipeline *create_pipeline(SDL_GPUDevice *device,
                             .instance_step_rate = 0,
                             .pitch = sizeof(vertex),
                         }},
-                .num_vertex_attributes = 2,
+                .num_vertex_attributes = 3,
                 .vertex_attributes =
                     (SDL_GPUVertexAttribute[]){
                         (SDL_GPUVertexAttribute){
@@ -82,12 +83,17 @@ SDL_GPUGraphicsPipeline *create_pipeline(SDL_GPUDevice *device,
                             .format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3,
                             .offset = offsetof(vertex, position),
                         },
-
                         (SDL_GPUVertexAttribute){
                             .buffer_slot = 0,
                             .location = 1,
                             .format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3,
                             .offset = offsetof(vertex, color),
+                        },
+                        (SDL_GPUVertexAttribute){
+                            .buffer_slot = 0,
+                            .location = 2,
+                            .format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2,
+                            .offset = offsetof(vertex, uv),
                         },
                     }},
 
@@ -125,7 +131,7 @@ int main() {
     SDL_SetWindowRelativeMouseMode(window, true);
 
     SDL_GPUDevice *device =
-        SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV, false, NULL);
+        SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV, true, NULL);
     if (!device) {
         SDL_Log("SDL_CreateGPUDevice failed: %s\n", SDL_GetError());
         return EXIT_FAILURE;
@@ -147,10 +153,10 @@ int main() {
     }
 
     const vertex vertices[] = {
-        (vertex){{0.5f, 0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},
-        (vertex){{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}},
-        (vertex){{-0.5f, -0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}},
-        (vertex){{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 0.0f}}};
+        (vertex){{0.5f, 0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
+        (vertex){{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+        (vertex){{-0.5f, -0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}},
+        (vertex){{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 0.0f}, {0.0f, 1.0f}}};
 
     const size_t vertex_count = ARRAY_LENGTH(vertices);
 
