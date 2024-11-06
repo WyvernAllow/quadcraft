@@ -8,6 +8,7 @@ add_executable(${PROJECT_NAME}
     src/camera.c
     src/camera.h
     src/block_type.h
+    src/block_type.c
     src/chunk.h
     src/chunk.c
 )
@@ -21,9 +22,11 @@ endif()
 set(SDL_SHARED OFF)
 set(SDL_STATIC ON)
 add_subdirectory(deps/SDL)
+add_subdirectory(deps/FastNoiseLite)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
     SDL3-static
+    FastNoiseLite
 )
 
 find_package(Vulkan COMPONENTS glslc)
