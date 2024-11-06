@@ -15,6 +15,7 @@ add_executable(${PROJECT_NAME}
 
 if(MSVC)
     target_compile_options(${PROJECT_NAME} PRIVATE /W4)
+    set_property(TARGET ${PROJECT_NAME} PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 else()
     target_compile_options(${PROJECT_NAME} PRIVATE -std=c99 -pedantic -Wall -Wextra)
 endif()
