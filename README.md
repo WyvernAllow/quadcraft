@@ -25,7 +25,7 @@ cmake --build quadcraft --config Release
 ```
 
 # Dependencies
-* [SDL](https://github.com/libsdl-org/SDL)
+* [SDL](https://libsdl.org/)
 * [FastNoiseLite](https://github.com/Auburn/FastNoiseLite)
 
 # License
