@@ -11,18 +11,9 @@
 typedef struct chunk_vertex {
     vec3 position;
     vec3 normal;
+
+    vec2 atlas_offset;
 } chunk_vertex;
-
-typedef enum direction {
-    DIR_POS_X,
-    DIR_POS_Y,
-    DIR_POS_Z,
-    DIR_NEG_X,
-    DIR_NEG_Y,
-    DIR_NEG_Z,
-
-    DIR_COUNT,
-} direction;
 
 vec3 normal_lut[DIR_COUNT] = {
     [DIR_POS_X] = (vec3){1.0f, 0.0f, 0.0f},
@@ -113,7 +104,14 @@ SDL_GPUGraphicsPipeline *create_pipeline(SDL_GPUDevice *device,
         (SDL_GPUVertexAttribute){.buffer_slot = 0,
                                  .location = 1,
                                  .format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3,
-                                 .offset = offsetof(chunk_vertex, normal)}};
+                                 .offset = offsetof(chunk_vertex, normal)},
+
+        /* Atlas offset attribute */
+        (SDL_GPUVertexAttribute){
+            .buffer_slot = 0,
+            .location = 2,
+            .format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2,
+            .offset = offsetof(chunk_vertex, atlas_offset)}};
 
     info.vertex_input_state = (SDL_GPUVertexInputState){
         .vertex_buffer_descriptions = vertex_buffer_descriptions,
@@ -166,9 +164,12 @@ typedef struct chunk_mesh {
 
     uint16_t *indices;
     size_t index_count;
+
+    bool is_dirty;
 } chunk_mesh;
 
-void append_quad(chunk_mesh *mesh, vec3 offset, vec3 normal) {
+void append_quad(chunk_mesh *mesh, vec3 offset, vec3 normal,
+                 vec2 atlas_offset) {
     vec3 up = {0.0f, 1.0f, 0.0f};
     if (fabsf(normal.y) > 0.9f) {
         up = (vec3){1.0f, 0.0f, 0.0f};
@@ -193,6 +194,7 @@ void append_quad(chunk_mesh *mesh, vec3 offset, vec3 normal) {
         mesh->vertices[mesh->vertex_count].position =
             vec3_add(positions[i], (vec3){0.5f, 0.5f, 0.5f});
         mesh->vertices[mesh->vertex_count].normal = normal;
+        mesh->vertices[mesh->vertex_count].atlas_offset = atlas_offset;
         mesh->vertex_count++;
     }
 
@@ -205,6 +207,9 @@ void append_quad(chunk_mesh *mesh, vec3 offset, vec3 normal) {
 }
 
 void chunk_generate_mesh(const chunk *chunk, chunk_mesh *mesh) {
+    mesh->vertex_count = 0;
+    mesh->index_count = 0;
+
     for (int z = 0; z < CHUNK_SIZE; z++) {
         for (int x = 0; x < CHUNK_SIZE; x++) {
             for (int y = 0; y < CHUNK_SIZE; y++) {
@@ -216,10 +221,18 @@ void chunk_generate_mesh(const chunk *chunk, chunk_mesh *mesh) {
                     block_type compare_block =
                         chunk_get_block(chunk, (int)adjacent.x, (int)adjacent.y,
                                         (int)adjacent.z);
-                    if (compare_block == BLOCK_AIR) {
-                        append_quad(mesh,
-                                    vec3_add(vec3_scale(normal, 0.5), position),
-                                    normal);
+
+                    block_type current_block = chunk_get_block(chunk, x, y, z);
+                    if (current_block != BLOCK_AIR) {
+                        const block_properties *properties =
+                            get_block_properties(current_block);
+
+                        if (compare_block == BLOCK_AIR) {
+                            append_quad(
+                                mesh,
+                                vec3_add(vec3_scale(normal, 0.5), position),
+                                normal, properties->atlas_offsets[d]);
+                        }
                     }
                 }
             }
@@ -242,7 +255,7 @@ int main(void) {
 
     SDL_SetWindowRelativeMouseMode(window, true);
 
-    SDL_Surface *surface = SDL_LoadBMP("res/textures/stone.bmp");
+    SDL_Surface *surface = SDL_LoadBMP("res/textures/atlas.bmp");
     if (!surface) {
         SDL_Log("SDL_LoadBMP failed: %s\n", SDL_GetError());
         return EXIT_FAILURE;
@@ -314,7 +327,10 @@ int main(void) {
     mesh.vertices = (chunk_vertex *)data;
     mesh.indices = (uint16_t *)(data + sizeof(chunk_vertex) * MAX_VERTS);
 
+    mesh.is_dirty = true;
+
     chunk_generate_mesh(&chunk, &mesh);
+    mesh.is_dirty = false;
 
     SDL_UnmapGPUTransferBuffer(device, buffer_trans_buffer);
 
@@ -374,7 +390,6 @@ int main(void) {
 
     SDL_EndGPUCopyPass(copy_pass);
     SDL_SubmitGPUCommandBuffer(upload_cmdbuf);
-    SDL_ReleaseGPUTransferBuffer(device, buffer_trans_buffer);
     SDL_ReleaseGPUTransferBuffer(device, texture_trans_buf);
 
     SDL_GPUTexture *depth = create_depth_texture(device, 800, 450);
@@ -391,6 +406,8 @@ int main(void) {
 
     uint32_t old_w = 800;
     uint32_t old_h = 450;
+
+    block_type type = BLOCK_STONE;
 
     bool is_running = true;
     while (is_running) {
@@ -414,6 +431,14 @@ int main(void) {
                     } else {
                         SDL_SetWindowFullscreen(window, false);
                     }
+                }
+
+                if (e.key.scancode >= 30 && e.key.scancode < 39) {
+                    int block_type = e.key.scancode - 30;
+
+                    type = block_type;
+
+                    SDL_Log("Selected block type: %i\n", type);
                 }
             }
         }
@@ -441,6 +466,29 @@ int main(void) {
             wishdir = vec3_add(wishdir, cam.right);
         }
 
+        float_t x, y;
+        SDL_MouseButtonFlags mouse_state = SDL_GetMouseState(&x, &y);
+
+        if (mouse_state & SDL_BUTTON_MASK(SDL_BUTTON_LEFT)) {
+            vec3 cam_forward = vec3_add(cam.position, cam.forward);
+            int x_pos = (int)cam_forward.x;
+            int y_pos = (int)cam_forward.y;
+            int z_pos = (int)cam_forward.z;
+
+            chunk_set_block(&chunk, x_pos, y_pos, z_pos, BLOCK_AIR);
+            mesh.is_dirty = true;
+        }
+
+        if (mouse_state & SDL_BUTTON_MASK(SDL_BUTTON_RIGHT)) {
+            vec3 cam_forward = vec3_add(cam.position, cam.forward);
+            int x_pos = (int)cam_forward.x;
+            int y_pos = (int)cam_forward.y;
+            int z_pos = (int)cam_forward.z;
+
+            chunk_set_block(&chunk, x_pos, y_pos, z_pos, type);
+            mesh.is_dirty = true;
+        }
+
         cam.position = vec3_add(
             cam.position, vec3_scale(vec3_norm(wishdir), 6.0f * delta_time));
 
@@ -450,6 +498,51 @@ int main(void) {
         if (!cmdbuf) {
             SDL_Log("SDL_AcquireGPUCommandBuffer failed: %s\n", SDL_GetError());
             return EXIT_FAILURE;
+        }
+
+        if (mesh.is_dirty) {
+            uint8_t *data =
+                SDL_MapGPUTransferBuffer(device, buffer_trans_buffer, true);
+
+            mesh.vertices = (chunk_vertex *)data;
+            mesh.indices =
+                (uint16_t *)(data + sizeof(chunk_vertex) * MAX_VERTS);
+
+            chunk_generate_mesh(&chunk, &mesh);
+
+            SDL_Log("Generated mesh (%zu verts, %zu indices)",
+                    mesh.vertex_count, mesh.index_count);
+
+            SDL_UnmapGPUTransferBuffer(device, buffer_trans_buffer);
+
+            SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(cmdbuf);
+
+            SDL_UploadToGPUBuffer(
+                copy_pass,
+                &(SDL_GPUTransferBufferLocation){
+                    .transfer_buffer = buffer_trans_buffer, .offset = 0},
+                &(SDL_GPUBufferRegion){
+                    .buffer = vertex_buffer,
+                    .offset = 0,
+                    .size = sizeof(chunk_vertex) * mesh.vertex_count,
+                },
+                false);
+
+            SDL_UploadToGPUBuffer(
+                copy_pass,
+                &(SDL_GPUTransferBufferLocation){
+                    .transfer_buffer = buffer_trans_buffer,
+                    .offset = sizeof(chunk_vertex) * MAX_VERTS},
+                &(SDL_GPUBufferRegion){
+                    .buffer = index_buffer,
+                    .offset = 0,
+                    .size = sizeof(uint16_t) * mesh.index_count,
+                },
+                false);
+
+            SDL_EndGPUCopyPass(copy_pass);
+
+            mesh.is_dirty = false;
         }
 
         uint32_t new_w;
@@ -521,6 +614,7 @@ int main(void) {
         SDL_SubmitGPUCommandBuffer(cmdbuf);
     }
 
+    SDL_ReleaseGPUTransferBuffer(device, buffer_trans_buffer);
     SDL_ReleaseGPUTexture(device, depth);
     SDL_ReleaseGPUGraphicsPipeline(device, pipeline);
     SDL_ReleaseGPUBuffer(device, index_buffer);
