@@ -7,6 +7,8 @@ add_executable(${PROJECT_NAME}
     src/lmath.h
     src/camera.c
     src/camera.h
+    src/chunk_mesh.h
+    src/chunk_mesh.c
     src/block_type.h
     src/block_type.c
     src/chunk.h
