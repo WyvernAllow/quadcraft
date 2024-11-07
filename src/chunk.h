@@ -9,6 +9,8 @@ typedef struct chunk {
     int x;
     int y;
     block_type blocks[CHUNK_VOLUME];
+    
+    bool is_dirty;
 } chunk;
 
 void chunk_init(chunk *chunk);
