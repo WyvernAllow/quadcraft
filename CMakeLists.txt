@@ -11,6 +11,7 @@ add_executable(${PROJECT_NAME}
     src/block_type.c
     src/chunk.h
     src/chunk.c
+    src/utils.h
 )
 
 if(MSVC)

@@ -5,8 +5,7 @@
 #include "camera.h"
 #include "chunk.h"
 #include "lmath.h"
-
-#define ARRAY_LEN(x) (sizeof(x) / sizeof((x)[0]))
+#include "utils.h"
 
 typedef struct chunk_vertex {
     vec3 position;
