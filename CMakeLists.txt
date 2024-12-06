@@ -17,8 +17,11 @@ add_subdirectory(deps/spdlog)
 add_subdirectory(deps/glfw)
 add_subdirectory(deps/glm)
 
+find_package(Vulkan REQUIRED)
+
 target_link_libraries(${PROJECT_NAME} PRIVATE
 	spdlog
 	glfw
 	glm
+	Vulkan::Vulkan
 )
