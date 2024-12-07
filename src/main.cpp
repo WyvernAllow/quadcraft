@@ -1,12 +1,16 @@
 #include <spdlog/spdlog.h>
 
 #include <cstdlib>
+#include <iomanip>
+#include <sstream>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 #include <vulkan/vk_enum_string_helper.h>
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_core.h>
+
+#include "device.hpp"
 
 static const std::vector<const char*> validation_layers = {
     "VK_LAYER_KHRONOS_validation",
@@ -94,6 +98,19 @@ static VkDebugUtilsMessengerEXT create_messenger(
     return messenger;
 }
 
+static VkSurfaceKHR create_surface(VkInstance instance, GLFWwindow* window) {
+    VkSurfaceKHR surface;
+    VkResult result =
+        glfwCreateWindowSurface(instance, window, nullptr, &surface);
+    if (result != VK_SUCCESS) {
+        spdlog::critical("glfwCreateWindowSurface failed: {}",
+                         string_VkResult(result));
+        return nullptr;
+    }
+
+    return surface;
+}
+
 int main() {
     glfwSetErrorCallback(glfw_error_callback);
     if (!glfwInit()) {
@@ -130,10 +147,21 @@ int main() {
         return EXIT_FAILURE;
     }
 
+    VkSurfaceKHR surface = create_surface(instance, window);
+    if (!surface) {
+        return EXIT_FAILURE;
+    }
+
+    device device(instance, surface);
+
+    spdlog::info("Device name: {}", device.properties.deviceName);
+
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
     }
 
+    vkDestroyDevice(device.logical_device, nullptr);
+    vkDestroySurfaceKHR(instance, surface, nullptr);
     vkDestroyDebugUtilsMessengerEXT(instance, messenger, nullptr);
     vkDestroyInstance(instance, nullptr);
     glfwDestroyWindow(window);

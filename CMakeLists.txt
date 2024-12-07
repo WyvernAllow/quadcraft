@@ -10,6 +10,8 @@ project(quadcraft VERSION 0.1.0 LANGUAGES C CXX)
 add_executable(${PROJECT_NAME}
 	src/main.cpp
 	src/extensions.cpp
+	src/device.hpp
+	src/device.cpp
 )
 
 set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 17)
