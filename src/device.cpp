@@ -179,10 +179,16 @@ device::device(VkInstance instance, VkSurfaceKHR surface) {
         queue_create_infos.push_back(queue_create_info);
     }
 
+    const std::vector<const char*> extensions = {
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+    };
+
     VkDeviceCreateInfo device_create_info{};
     device_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     device_create_info.queueCreateInfoCount = queue_create_infos.size();
     device_create_info.pQueueCreateInfos = queue_create_infos.data();
+    device_create_info.enabledExtensionCount = extensions.size();
+    device_create_info.ppEnabledExtensionNames = extensions.data();
 
     VkResult result = vkCreateDevice(physical_device, &device_create_info,
                                      nullptr, &logical_device);
