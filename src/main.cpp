@@ -11,6 +11,7 @@
 #include <vulkan/vulkan_core.h>
 
 #include "device.hpp"
+#include "swapchain.hpp"
 
 static const std::vector<const char*> validation_layers = {
     "VK_LAYER_KHRONOS_validation",
@@ -153,12 +154,15 @@ int main() {
     }
 
     device device(instance, surface);
+    swapchain swapchain(device, surface, window);
 
     spdlog::info("Device name: {}", device.properties.deviceName);
 
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
     }
+
+    swapchain.cleanup(device);
 
     vkDestroyDevice(device.logical_device, nullptr);
     vkDestroySurfaceKHR(instance, surface, nullptr);

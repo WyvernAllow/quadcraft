@@ -12,6 +12,8 @@ add_executable(${PROJECT_NAME}
 	src/extensions.cpp
 	src/device.hpp
 	src/device.cpp
+	src/swapchain.hpp
+	src/swapchain.cpp
 )
 
 set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 17)
