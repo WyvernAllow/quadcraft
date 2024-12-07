@@ -30,3 +30,24 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 	glm
 	Vulkan::Vulkan
 )
+
+set(SHADER_SOURCES
+	res/shaders/main.vert
+	res/shaders/main.frag
+)
+
+foreach(SHADER_PATH ${SHADER_SOURCES})
+	set(INPUT_PATH ${CMAKE_CURRENT_SOURCE_DIR}/${SHADER_PATH})
+	set(OUTPUT_PATH ${CMAKE_BINARY_DIR}/${SHADER_PATH}.spv)
+
+	add_custom_command(
+		OUTPUT ${OUTPUT_PATH}
+		COMMAND Vulkan::glslc ${INPUT_PATH} -o ${OUTPUT_PATH}
+		DEPENDS ${SHADER_PATH}
+		COMMENT "Compiling ${SHADER_PATH}"
+	)
+	list(APPEND SPIRV_FILES ${OUTPUT_PATH})
+endforeach()
+
+add_custom_target(shaders_target ALL DEPENDS ${SPIRV_FILES})
+add_dependencies(${PROJECT_NAME} shaders_target)
