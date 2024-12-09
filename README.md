@@ -18,5 +18,10 @@ cmake --build build
 
 The resulting executable will be located somewhere in the `build/` directory.
 
+# Libraries used
+[glfw](https://www.glfw.org/)
+[glm](https://github.com/g-truc/glm)
+[spdlog](https://github.com/gabime/spdlog)
+
 # License
 * Quadcraft is licensed under the zlib license, available in [LICENSE.txt](https://github.com/WyvernAllow/quadcraft/blob/master/LICENSE.txt)
