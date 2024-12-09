@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstdlib>
+#include <optional>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -103,6 +104,18 @@ static VkDebugUtilsMessengerEXT create_messenger(
     return messenger;
 }
 
+static VkSurfaceKHR create_surface(VkInstance instance, GLFWwindow* window) {
+    VkSurfaceKHR surface;
+    VkResult result =
+        glfwCreateWindowSurface(instance, window, nullptr, &surface);
+    if (result != VK_SUCCESS) {
+        spdlog::critical("glfwCreateWindowSurface failed: {}",
+                         string_VkResult(result));
+        return nullptr;
+    }
+    return surface;
+}
+
 int main() {
     glfwSetErrorCallback(glfw_error_callback);
     if (!glfwInit()) {
@@ -141,10 +154,16 @@ int main() {
         return EXIT_FAILURE;
     }
 
+    VkSurfaceKHR surface = create_surface(instance, window);
+    if (!surface) {
+        return EXIT_FAILURE;
+    }
+
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
     }
 
+    vkDestroySurfaceKHR(instance, surface, nullptr);
     vkDestroyDebugUtilsMessengerEXT(instance, messenger, nullptr);
     vkDestroyInstance(instance, nullptr);
     glfwDestroyWindow(window);
