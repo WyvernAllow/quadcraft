@@ -8,6 +8,8 @@ endif()
 project(quadcraft VERSION 0.1.0 LANGUAGES C CXX)
 
 add_executable(${PROJECT_NAME}
+    src/application.hpp
+    src/application.cpp
     src/extensions.cpp
     src/main.cpp
 )
