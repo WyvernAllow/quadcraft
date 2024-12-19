@@ -13,10 +13,12 @@ add_executable(${PROJECT_NAME}
 
 set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 17)
 
+add_subdirectory(deps/glad)
 add_subdirectory(deps/glfw)
 add_subdirectory(deps/spdlog)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
+    glad
     glfw
     spdlog
 )
