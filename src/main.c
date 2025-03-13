@@ -1,6 +1,10 @@
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "camera.h"
+#include "lmath.h"
 
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
@@ -121,6 +125,34 @@ typedef struct vertex {
     float position[3];
 } vertex;
 
+static camera cam;
+
+static float last_x;
+static float last_y;
+static bool first_mouse = true;
+
+#define CAM_SPEED 10.0f
+#define CAM_SENSITIVITY 0.3f
+
+static void glfw_cursor_pos_callback(GLFWwindow *window, double x, double y) {
+    (void)window;
+
+    if (first_mouse) {
+        last_x = x;
+        last_y = y;
+        first_mouse = false;
+    }
+
+    float delta_x = x - last_x;
+    float delta_y = y - last_y;
+
+    last_x = x;
+    last_y = y;
+
+    cam.yaw += to_rad(delta_x * CAM_SENSITIVITY);
+    cam.pitch += to_rad(-delta_y * CAM_SENSITIVITY);
+}
+
 int main(void) {
     glfwSetErrorCallback(glfw_error_callback);
     if (!glfwInit()) {
@@ -144,6 +176,11 @@ int main(void) {
         return EXIT_FAILURE;
     }
 
+    glfwSwapInterval(0);
+
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetCursorPosCallback(window, glfw_cursor_pos_callback);
+
     GLuint program =
         compile_program("res/shaders/main.vert", "res/shaders/main.frag");
     if (!program) {
@@ -153,10 +190,10 @@ int main(void) {
 
     // clang-format off
     vertex vertices[] = {
-       { 0.5f,  0.5f, 0.0f},
-       { 0.5f, -0.5f, 0.0f},
-       {-0.5f, -0.5f, 0.0f},
-       {-0.5f,  0.5f, 0.0f},
+       { 0.5f,  0.5f, -1.0f},
+       { 0.5f, -0.5f, -1.0f},
+       {-0.5f, -0.5f, -1.0f},
+       {-0.5f,  0.5f, -1.0f},
     };
     // clang-format on
 
@@ -187,13 +224,50 @@ int main(void) {
 
     glBindVertexArray(0);
 
+    init_camera(&cam, to_rad(85.0f), 800.0f / 450.0f, 0.01f, 1000.0f);
+
+    float current_time = glfwGetTime();
+    float last_time = current_time;
+
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
+
+        current_time = glfwGetTime();
+        float delta_time = current_time - last_time;
+        last_time = current_time;
+
+        vec3 wishdir = {0};
+        if (glfwGetKey(window, GLFW_KEY_W)) {
+            wishdir = vec3_add(wishdir, cam.forward);
+        }
+
+        if (glfwGetKey(window, GLFW_KEY_S)) {
+            wishdir = vec3_sub(wishdir, cam.forward);
+        }
+
+        if (glfwGetKey(window, GLFW_KEY_D)) {
+            wishdir = vec3_add(wishdir, cam.right);
+        }
+
+        if (glfwGetKey(window, GLFW_KEY_A)) {
+            wishdir = vec3_sub(wishdir, cam.right);
+        }
+
+        cam.position = vec3_add(
+            cam.position,
+            vec3_scale(vec3_normalized(wishdir), delta_time * CAM_SPEED));
+
+        update_camera(&cam);
 
         glClearColor(1.0, 1.0, 1.0, 1.0);
         glClear(GL_COLOR_BUFFER_BIT);
 
         glUseProgram(program);
+        glUniformMatrix4fv(glGetUniformLocation(program, "u_view"), 1, GL_FALSE,
+                           cam.view.data);
+        glUniformMatrix4fv(glGetUniformLocation(program, "u_proj"), 1, GL_FALSE,
+                           cam.proj.data);
+
         glBindVertexArray(vao);
 
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, NULL);
