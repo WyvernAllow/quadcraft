@@ -2,8 +2,11 @@ cmake_minimum_required(VERSION 3.5)
 project(quadcraft VERSION 0.1.0 LANGUAGES C)
 
 add_executable(${PROJECT_NAME}
+    src/block_type.h
     src/camera.c
     src/camera.h
+    src/chunk.c
+    src/chunk.h
     src/lmath.c
     src/lmath.h
     src/main.c
