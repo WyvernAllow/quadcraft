@@ -23,6 +23,7 @@ void update_camera(camera *cam) {
 
     /* Pitch values of +-90 degrees cause the camera to flip. */
     cam->pitch = clampf(cam->pitch, -M_PI / 2.0 + 1e-5, M_PI / 2.0 - 1e-5);
+    cam->yaw = fmodf(cam->yaw + 2.0f * M_PI, 2.0f * M_PI);
 
     vec3 forward = {
         .x = cosf(cam->yaw) * cosf(cam->pitch),
