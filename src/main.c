@@ -4,11 +4,13 @@
 #include <string.h>
 
 #include "camera.h"
+#include "chunk.h"
 #include "lmath.h"
 
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 #include <glad/gl.h>
+#include <stdio.h>
 
 static void glfw_error_callback(int error_code, const char *description) {
     (void)error_code;
@@ -122,7 +124,8 @@ static GLuint compile_program(const char *vert_filename,
 }
 
 typedef struct vertex {
-    float position[3];
+    vec3 position;
+    vec3 normal;
 } vertex;
 
 static camera cam;
@@ -153,6 +156,94 @@ static void glfw_cursor_pos_callback(GLFWwindow *window, double x, double y) {
     cam.pitch += to_rad(-delta_y * CAM_SENSITIVITY);
 }
 
+typedef enum direction {
+    DIR_POS_X,
+    DIR_POS_Y,
+    DIR_POS_Z,
+    DIR_NEG_X,
+    DIR_NEG_Y,
+    DIR_NEG_Z,
+
+    DIR_COUNT,
+} direction;
+
+// clang-format off
+static const int NORMAL_TABLE[DIR_COUNT][3] = {
+    [DIR_POS_X] = { 1,  0,  0},
+    [DIR_POS_Y] = { 0,  1,  0},
+    [DIR_POS_Z] = { 0,  0,  1},
+    [DIR_NEG_X] = {-1,  0,  0},
+    [DIR_NEG_Y] = { 0, -1,  0},
+    [DIR_NEG_Z] = { 0,  0, -1},
+};
+
+static const vec3 QUAD_TABLE[DIR_COUNT][4] = {
+    [DIR_POS_X] = {{1.0f,  0.0f,  0.0f}, {1.0f,  0.0f, -1.0f}, {1.0f,  1.0f, -1.0f}, {1.0f,  1.0f,  0.0f}},
+    [DIR_POS_Y] = {{1.0f,  1.0f,  0.0f}, {1.0f,  1.0f, -1.0f}, {0.0f,  1.0f, -1.0f}, {0.0f,  1.0f,  0.0f}},
+    [DIR_POS_Z] = {{0.0f,  0.0f,  0.0f}, {1.0f,  0.0f,  0.0f}, {1.0f,  1.0f,  0.0f}, {0.0f,  1.0f,  0.0f}},
+    [DIR_NEG_X] = {{0.0f,  0.0f,  0.0f}, {0.0f,  1.0f,  0.0f}, {0.0f,  1.0f, -1.0f}, {0.0f,  0.0f, -1.0f}},
+    [DIR_NEG_Y] = {{1.0f,  0.0f,  0.0f}, {0.0f,  0.0f,  0.0f}, {0.0f,  0.0f, -1.0f}, {1.0f,  0.0f, -1.0f}},
+    [DIR_NEG_Z] = {{0.0f,  1.0f, -1.0f}, {1.0f,  1.0f, -1.0f}, {1.0f,  0.0f, -1.0f}, {0.0f,  0.0f, -1.0f}},
+};
+// clang-format on
+
+vec3 dir_to_normal(direction dir) {
+    return (vec3){
+        NORMAL_TABLE[dir][0],
+        NORMAL_TABLE[dir][1],
+        NORMAL_TABLE[dir][2],
+    };
+}
+
+vertex *vertices;
+size_t vertex_count;
+
+static inline void add_quad(int x, int y, int z, direction dir) {
+    vec3 position = {x, y, z};
+    vec3 normal = dir_to_normal(dir);
+
+    for (size_t i = 0; i < 4; i++) {
+        vertices[vertex_count++] = (vertex){
+            .position = vec3_add(position, QUAD_TABLE[dir][i]),
+            .normal = normal,
+        };
+    }
+}
+
+static inline void mesh_block(const chunk *chunk, int x, int y, int z) {
+    block_type current = get_block(chunk, x, y, z);
+    if (current == BLOCK_AIR) {
+        return;
+    }
+
+    for (direction dir = 0; dir < DIR_COUNT; dir++) {
+        int nx = x + NORMAL_TABLE[dir][0];
+        int ny = y + NORMAL_TABLE[dir][1];
+        int nz = z + NORMAL_TABLE[dir][2];
+
+        block_type neighbor = get_block(chunk, nx, ny, nz);
+        if (neighbor == BLOCK_AIR) {
+            add_quad(x, y, z, dir);
+        }
+    }
+}
+
+void mesh_chunk(const chunk *chunk) {
+    vertex_count = 0;
+
+    for (int z = 0; z < CHUNK_SIZE; z++) {
+        for (int y = 0; y < CHUNK_SIZE; y++) {
+            for (int x = 0; x < CHUNK_SIZE; x++) {
+                mesh_block(chunk, x, y, z);
+            }
+        }
+    }
+}
+
+#define MAX_QUAD_COUNT ((CHUNK_VOLUME * 6) / 2)
+#define MAX_VERT_COUNT (MAX_QUAD_COUNT * 4)
+#define MAX_INDEX_COUNT (MAX_QUAD_COUNT * 6)
+
 int main(void) {
     glfwSetErrorCallback(glfw_error_callback);
     if (!glfwInit()) {
@@ -163,7 +254,7 @@ int main(void) {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    GLFWwindow *window = glfwCreateWindow(800, 450, "Quadcraft", NULL, NULL);
+    GLFWwindow *window = glfwCreateWindow(1920, 1080, "Quadcraft", NULL, NULL);
     if (!window) {
         fprintf(stderr, "glfwCreateWindow failed\n");
         return EXIT_FAILURE;
@@ -188,18 +279,30 @@ int main(void) {
         return EXIT_FAILURE;
     }
 
-    // clang-format off
-    vertex vertices[] = {
-       { 0.5f,  0.5f, -1.0f},
-       { 0.5f, -0.5f, -1.0f},
-       {-0.5f, -0.5f, -1.0f},
-       {-0.5f,  0.5f, -1.0f},
-    };
-    // clang-format on
+    chunk chunk;
+    for (int z = 0; z < CHUNK_SIZE; z++) {
+        for (int y = 0; y < CHUNK_SIZE; y++) {
+            for (int x = 0; x < CHUNK_SIZE; x++) {
+                set_block(&chunk, x, y, z, BLOCK_DIRT);
+            }
+        }
+    }
 
-    uint16_t indices[] = {
-        0, 1, 3, 1, 2, 3,
-    };
+    vertices = malloc(sizeof(vertex) * MAX_VERT_COUNT);
+    mesh_chunk(&chunk);
+
+    uint32_t *indices = malloc(sizeof(uint32_t) * MAX_INDEX_COUNT);
+    uint32_t offset = 0;
+    for (uint32_t i = 0; i < MAX_INDEX_COUNT; i += 6) {
+        indices[i + 0] = 0 + offset;
+        indices[i + 1] = 1 + offset;
+        indices[i + 2] = 3 + offset;
+        indices[i + 3] = 1 + offset;
+        indices[i + 4] = 2 + offset;
+        indices[i + 5] = 3 + offset;
+
+        offset += 4;
+    }
 
     GLuint vao;
     GLuint vbo;
@@ -211,20 +314,33 @@ int main(void) {
     glBindVertexArray(vao);
 
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertex) * vertex_count, vertices,
+                 GL_STATIC_DRAW);
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices,
-                 GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint32_t) * MAX_INDEX_COUNT,
+                 indices, GL_STATIC_DRAW);
 
     /* Position attribute */
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(vertex),
                           (const void *)offsetof(vertex, position));
 
+    /* Normal attribute */
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(vertex),
+                          (const void *)offsetof(vertex, normal));
+
     glBindVertexArray(0);
 
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
+
     init_camera(&cam, to_rad(85.0f), 800.0f / 450.0f, 0.01f, 1000.0f);
+
+    cam.position.x = 0.0f;
+    cam.position.y = 0.0f;
+    cam.position.z = 0.0f;
 
     float current_time = glfwGetTime();
     float last_time = current_time;
@@ -259,8 +375,8 @@ int main(void) {
 
         update_camera(&cam);
 
-        glClearColor(1.0, 1.0, 1.0, 1.0);
-        glClear(GL_COLOR_BUFFER_BIT);
+        glClearColor(0.1, 0.1, 0.1, 0.1);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         glUseProgram(program);
         glUniformMatrix4fv(glGetUniformLocation(program, "u_view"), 1, GL_FALSE,
@@ -270,7 +386,8 @@ int main(void) {
 
         glBindVertexArray(vao);
 
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, NULL);
+        glDrawElements(GL_TRIANGLES, (vertex_count / 4) * 6, GL_UNSIGNED_INT,
+                       NULL);
 
         glBindVertexArray(0);
         glUseProgram(0);
