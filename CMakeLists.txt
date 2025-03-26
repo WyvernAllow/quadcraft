@@ -5,6 +5,8 @@ add_executable(${PROJECT_NAME}
     src/main.c
     src/math2d.c
     src/math2d.h
+    src/utils.c
+    src/utils.h
 )
 
 set_property(TARGET ${PROJECT_NAME} PROPERTY C_STANDARD 99)
