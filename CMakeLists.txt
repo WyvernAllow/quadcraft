@@ -14,8 +14,10 @@ else()
     target_compile_options(${PROJECT_NAME} PRIVATE -std=c99 -pedantic -Wall -Wextra)
 endif()
 
+add_subdirectory(deps/glad)
 add_subdirectory(deps/glfw)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
+    glad
     glfw
 )
