@@ -12,7 +12,7 @@ SpaceAfterCStyleCast: false
 AlignConsecutiveDeclarations: false
 AlignConsecutiveAssignments: false
 AlignTrailingComments: true
-PointerAlignment: Right
+PointerAlignment: Left
 DerivePointerAlignment: false
 IndentCaseLabels: false
 SpacesInParentheses: false
