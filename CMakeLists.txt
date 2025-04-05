@@ -5,6 +5,8 @@ if (POLICY CMP0141)
 	set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<IF:$<AND:$<C_COMPILER_ID:MSVC>,$<CXX_COMPILER_ID:MSVC>>,$<$<CONFIG:Debug,RelWithDebInfo>:EditAndContinue>,$<$<CONFIG:Debug,RelWithDebInfo>:ProgramDatabase>>")
 endif()
 
+cmake_policy(SET CMP0079 NEW)
+
 project(quadcraft VERSION 0.1.0 LANGUAGES C CXX)
 
 add_executable(${PROJECT_NAME}
@@ -18,6 +20,10 @@ add_subdirectory(deps/glfw)
 add_subdirectory(deps/glm)
 add_subdirectory(deps/imgui)
 add_subdirectory(deps/spdlog)
+
+target_link_libraries(imgui PRIVATE
+	glfw
+)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
 	glad
