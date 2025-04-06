@@ -10,6 +10,8 @@ cmake_policy(SET CMP0079 NEW)
 project(quadcraft VERSION 0.1.0 LANGUAGES C CXX)
 
 add_executable(${PROJECT_NAME}
+	src/camera.cpp
+	src/camera.hpp
 	src/main.cpp
 )
 
@@ -20,6 +22,7 @@ add_subdirectory(deps/glfw)
 add_subdirectory(deps/glm)
 add_subdirectory(deps/imgui)
 add_subdirectory(deps/spdlog)
+add_subdirectory(deps/stb_image)
 
 target_link_libraries(imgui PRIVATE
 	glfw
@@ -31,6 +34,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 	glm
 	imgui
 	spdlog
+	stb_image
 )
 
 add_custom_target(copy_assets
