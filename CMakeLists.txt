@@ -10,8 +10,14 @@ cmake_policy(SET CMP0079 NEW)
 project(quadcraft VERSION 0.1.0 LANGUAGES C CXX)
 
 add_executable(${PROJECT_NAME}
+	src/block_type.cpp
+	src/block_type.hpp
 	src/camera.cpp
 	src/camera.hpp
+	src/chunk.cpp
+	src/chunk.hpp
+	src/direction.cpp
+	src/direction.hpp
 	src/main.cpp
 )
 
